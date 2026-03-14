@@ -136,7 +136,7 @@ LIMIT $` + fmt.Sprintf("%d", len(args)+1) + ` OFFSET $` + fmt.Sprintf("%d", len(
 		SourceSet   map[string]struct{}
 	}
 	byVotation := map[string]*aggregate{}
-	orderedIDs := make([]string, 0, filters.Limit)
+	orderedIDs := make([]string, 0, 100)
 
 	for rows.Next() {
 		var (

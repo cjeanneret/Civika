@@ -11,6 +11,8 @@ jobs:
     name: Security gates (npm audit + govulncheck)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -42,6 +44,8 @@ jobs:
     name: RAG smoke (sans DB)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -61,6 +65,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: rag-smoke
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
