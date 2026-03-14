@@ -65,6 +65,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: rag-smoke
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
