@@ -3,11 +3,12 @@ module civika/backend
 go 1.26.1
 
 require (
-	github.com/go-chi/chi/v5 v5.1.0
+	github.com/go-chi/chi/v5 v5.2.2
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/pgvector/pgvector-go v0.3.0
 	golang.org/x/net v0.52.0
+	golang.org/x/time v0.15.0
 )
 
 require (
@@ -16,5 +17,4 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
-	golang.org/x/time v0.15.0 // indirect
 )
