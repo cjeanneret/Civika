@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"civika/backend/internal/debuglog"
+	"civika/backend/internal/rag"
 	"civika/backend/internal/services"
 )
 
@@ -43,6 +44,7 @@ type apiError struct {
 type apiHandlers struct {
 	votationService services.VotationService
 	qaService       services.QueryService
+	usageMetrics    rag.UsageMetricsReader
 	apiVersion      string
 	ragMode         string
 }
@@ -65,6 +67,7 @@ func (h apiHandlers) rootHandler(w http.ResponseWriter, _ *http.Request) {
 					"GET /api/v1/objects/{objectId}/sources",
 					"GET /api/v1/taxonomies",
 					"POST /api/v1/qa/query",
+					"GET /api/v1/metrics/ai-usage",
 				},
 			},
 		},
@@ -248,6 +251,123 @@ func (h apiHandlers) qaQueryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, output)
+}
+
+type usageMetricsResponse struct {
+	Granularity string `json:"granularity"`
+	Items       any    `json:"items"`
+	Meta        any    `json:"meta"`
+}
+
+func (h apiHandlers) metricsUsageHandler(w http.ResponseWriter, r *http.Request) {
+	if h.usageMetrics == nil {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "service_unavailable", "service indisponible")
+		return
+	}
+	filter, granularity, err := parseUsageMetricsFilter(r)
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_query", err.Error())
+		return
+	}
+	switch granularity {
+	case "event":
+		items, err := h.usageMetrics.ListUsageEvents(r.Context(), filter)
+		if err != nil {
+			writeAPIError(w, r, http.StatusInternalServerError, "internal_error", "erreur interne")
+			return
+		}
+		writeJSON(w, http.StatusOK, usageMetricsResponse{
+			Granularity: granularity,
+			Items:       items,
+			Meta: map[string]any{
+				"count": len(items),
+			},
+		})
+	case "day":
+		items, err := h.usageMetrics.ListUsageDailyAggregates(r.Context(), filter)
+		if err != nil {
+			writeAPIError(w, r, http.StatusInternalServerError, "internal_error", "erreur interne")
+			return
+		}
+		writeJSON(w, http.StatusOK, usageMetricsResponse{
+			Granularity: granularity,
+			Items:       items,
+			Meta: map[string]any{
+				"count": len(items),
+			},
+		})
+	default:
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_query", "granularity invalide")
+	}
+}
+
+func parseUsageMetricsFilter(r *http.Request) (rag.UsageListFilter, string, error) {
+	q := r.URL.Query()
+	granularity := strings.ToLower(strings.TrimSpace(q.Get("granularity")))
+	if granularity == "" {
+		granularity = "day"
+	}
+	if granularity != "event" && granularity != "day" {
+		return rag.UsageListFilter{}, "", errors.New("granularity doit etre event ou day")
+	}
+	limit := 100
+	offset := 0
+	var err error
+	if raw := strings.TrimSpace(q.Get("limit")); raw != "" {
+		limit, err = strconv.Atoi(raw)
+		if err != nil || limit < 1 || limit > 1000 {
+			return rag.UsageListFilter{}, "", errors.New("limit doit etre entre 1 et 1000")
+		}
+	}
+	if raw := strings.TrimSpace(q.Get("offset")); raw != "" {
+		offset, err = strconv.Atoi(raw)
+		if err != nil || offset < 0 {
+			return rag.UsageListFilter{}, "", errors.New("offset doit etre >= 0")
+		}
+	}
+	filter := rag.UsageListFilter{
+		Flow:      strings.ToLower(strings.TrimSpace(q.Get("flow"))),
+		Operation: strings.ToLower(strings.TrimSpace(q.Get("operation"))),
+		Mode:      strings.ToLower(strings.TrimSpace(q.Get("mode"))),
+		Limit:     limit,
+		Offset:    offset,
+	}
+	if filter.Flow != "" && !isAllowedValue(filter.Flow, []string{"rag_index", "qa_query"}) {
+		return rag.UsageListFilter{}, "", errors.New("flow invalide")
+	}
+	if filter.Operation != "" && !isAllowedValue(filter.Operation, []string{"embedding", "translation", "summarization"}) {
+		return rag.UsageListFilter{}, "", errors.New("operation invalide")
+	}
+	if filter.Mode != "" && !isAllowedValue(filter.Mode, []string{"local", "llm"}) {
+		return rag.UsageListFilter{}, "", errors.New("mode invalide")
+	}
+	from, err := parseUsageDateQuery(q.Get("from"))
+	if err != nil {
+		return rag.UsageListFilter{}, "", errors.New("from invalide (RFC3339)")
+	}
+	to, err := parseUsageDateQuery(q.Get("to"))
+	if err != nil {
+		return rag.UsageListFilter{}, "", errors.New("to invalide (RFC3339)")
+	}
+	if from != nil && to != nil && from.After(*to) {
+		return rag.UsageListFilter{}, "", errors.New("from doit etre <= to")
+	}
+	filter.FromUTC = from
+	filter.ToUTC = to
+	return filter, granularity, nil
+}
+
+func parseUsageDateQuery(raw string) (*time.Time, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, err
+	}
+	utc := parsed.UTC()
+	return &utc, nil
 }
 
 func parseVotationFilters(r *http.Request) (services.VotationFilters, error) {

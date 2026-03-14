@@ -25,9 +25,11 @@ type QAService struct {
 	embedder   rag.Embedder
 	summarizer rag.Summarizer
 	topK       int
+	metrics    rag.UsageMetricsWriter
+	ragMode    string
 }
 
-func NewQAService(store rag.VectorStore, embedder rag.Embedder, summarizer rag.Summarizer, topK int) *QAService {
+func NewQAService(store rag.VectorStore, embedder rag.Embedder, summarizer rag.Summarizer, topK int, metrics rag.UsageMetricsWriter, ragMode string) *QAService {
 	if topK <= 0 {
 		topK = 5
 	}
@@ -36,6 +38,8 @@ func NewQAService(store rag.VectorStore, embedder rag.Embedder, summarizer rag.S
 		embedder:   embedder,
 		summarizer: summarizer,
 		topK:       topK,
+		metrics:    metrics,
+		ragMode:    strings.TrimSpace(ragMode),
 	}
 }
 
@@ -50,6 +54,14 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 	}
 
 	safeQuestion := sanitizeQuestion(question)
+	requestID := strings.TrimSpace(debuglog.RunIDFromContext(ctx))
+	ctx = rag.WithUsageScope(ctx, rag.UsageScope{
+		Flow:      "qa_query",
+		Mode:      normalizeNonEmptyString(s.ragMode, "unknown"),
+		RequestID: requestID,
+		RunID:     requestID,
+	})
+	ctx = rag.WithUsageEmitter(ctx, s.recordUsageEvent)
 	// #region agent log
 	debuglog.Log(ctx, "H2", "backend/internal/services/qa_service.go:Query", "query rag start", map[string]any{
 		"embedder":      s.embedder.Name(),
@@ -128,6 +140,24 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 			UsedDocuments: usedDocs,
 		},
 	}, nil
+}
+
+func (s *QAService) recordUsageEvent(ctx context.Context, event rag.UsageEvent) {
+	if s.metrics == nil {
+		return
+	}
+	if err := s.metrics.RecordUsageEvent(ctx, event); err != nil {
+		debuglog.Log(ctx, "H5", "backend/internal/services/qa_service.go:recordUsageEvent", "usage metrics write failed", map[string]any{
+			"error": err.Error(),
+		})
+	}
+}
+
+func normalizeNonEmptyString(value string, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return strings.TrimSpace(value)
 }
 
 func sanitizeQuestion(question string) string {

@@ -25,3 +25,13 @@
 - Sbagl da connexiun DB: controllar `postgres` e `POSTGRES_*`.
 - Resposta RAG vida: far `make rag-index`, suenter `make rag-query Q="..."`.
 - Sbagl en modus `llm`: controllar `LLM_*` e `LLM_EMBEDDING_*`; nagin fallback automatic.
+
+## Inspectiun da las metricas IA
+- Controllar ils eveniments recents:
+  - `SELECT event_id, created_at, flow, operation, mode, total_tokens, status FROM ai_usage_events ORDER BY created_at DESC LIMIT 20;`
+- Controllar ils agregats dal di:
+  - `SELECT day, flow, operation, mode, total_tokens_sum, events_count FROM ai_usage_daily_agg ORDER BY day DESC LIMIT 20;`
+- Controllar las statisticas d'indexaziun per document:
+  - `SELECT run_id, document_id, chunks_count, llm_total_tokens_sum, embedding_total_tokens_sum FROM rag_index_document_metrics ORDER BY indexed_at DESC LIMIT 20;`
+- Endpoint d'exportaziun JSON:
+  - `GET /api/v1/metrics/ai-usage?granularity=day`

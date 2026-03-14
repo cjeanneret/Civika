@@ -71,13 +71,14 @@ func main() {
 		DefaultLanguage:    cfg.RAG.DefaultLanguage,
 		FallbackLanguage:   cfg.RAG.FallbackLanguage,
 	})
-	qaService := services.NewQAService(store, embedder, summarizer, cfg.RAG.TopK)
+	qaService := services.NewQAService(store, embedder, summarizer, cfg.RAG.TopK, store, cfg.RAG.Mode)
 
 	srv := &http.Server{
 		Addr: cfg.APIAddress(),
 		Handler: httpapi.NewRouter(cfg, httpapi.RouterDependencies{
 			VotationService: votationService,
 			QAService:       qaService,
+			UsageMetrics:    store,
 			APIVersion:      "v1",
 			RAGMode:         cfg.RAG.Mode,
 		}),

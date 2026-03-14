@@ -214,6 +214,19 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 			"client_timeoutMs": t.cfg.Timeout.Milliseconds(),
 		})
 		// #endregion
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "translation",
+			ProviderName: "llm",
+			ModelName:    t.cfg.ModelName,
+			SourceLang:   sourceLang,
+			TargetLang:   targetLang,
+			InputChars:   len(text),
+			OutputChars:  0,
+			UsageSource:  "unknown",
+			Status:       "error",
+			DurationMS:   time.Since(requestStarted).Milliseconds(),
+			ErrorCode:    "request_failed",
+		})
 		return "", false, fmt.Errorf("translation request failed: %w", err)
 	}
 	defer res.Body.Close()
@@ -227,12 +240,42 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 			"status_code":   res.StatusCode,
 		})
 		// #endregion
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "translation",
+			ProviderName: "llm",
+			ModelName:    t.cfg.ModelName,
+			SourceLang:   sourceLang,
+			TargetLang:   targetLang,
+			InputChars:   len(text),
+			OutputChars:  0,
+			UsageSource:  "unknown",
+			Status:       "error",
+			DurationMS:   time.Since(requestStarted).Milliseconds(),
+			ErrorCode:    fmt.Sprintf("status_%d", res.StatusCode),
+		})
 		return "", false, fmt.Errorf("translation request returned status %d", res.StatusCode)
 	}
 
 	responseBody, err := io.ReadAll(io.LimitReader(res.Body, 2*1024*1024))
 	if err != nil {
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "translation",
+			ProviderName: "llm",
+			ModelName:    t.cfg.ModelName,
+			SourceLang:   sourceLang,
+			TargetLang:   targetLang,
+			InputChars:   len(text),
+			OutputChars:  0,
+			UsageSource:  "unknown",
+			Status:       "error",
+			DurationMS:   time.Since(requestStarted).Milliseconds(),
+			ErrorCode:    "read_failed",
+		})
 		return "", false, fmt.Errorf("read translation response: %w", err)
+	}
+	usage, usageErr := ParseUsageFromResponseBody(responseBody)
+	if usageErr != nil {
+		usage = UsageEvent{UsageSource: "unknown"}
 	}
 	var response struct {
 		Choices []struct {
@@ -244,6 +287,22 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 		} `json:"choices"`
 	}
 	if err := json.Unmarshal(responseBody, &response); err != nil {
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "translation",
+			ProviderName: "llm",
+			ModelName:    t.cfg.ModelName,
+			SourceLang:   sourceLang,
+			TargetLang:   targetLang,
+			InputChars:   len(text),
+			OutputChars:  0,
+			InputTokens:  usage.InputTokens,
+			OutputTokens: usage.OutputTokens,
+			TotalTokens:  usage.TotalTokens,
+			UsageSource:  usage.UsageSource,
+			Status:       "error",
+			DurationMS:   time.Since(requestStarted).Milliseconds(),
+			ErrorCode:    "decode_failed",
+		})
 		return "", false, fmt.Errorf("decode translation response: %w", err)
 	}
 	firstChoiceMessageLen := 0
@@ -276,6 +335,22 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 			"duration_ms":   time.Since(requestStarted).Milliseconds(),
 		})
 		// #endregion
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "translation",
+			ProviderName: "llm",
+			ModelName:    t.cfg.ModelName,
+			SourceLang:   sourceLang,
+			TargetLang:   targetLang,
+			InputChars:   len(text),
+			OutputChars:  0,
+			InputTokens:  usage.InputTokens,
+			OutputTokens: usage.OutputTokens,
+			TotalTokens:  usage.TotalTokens,
+			UsageSource:  usage.UsageSource,
+			Status:       "error",
+			DurationMS:   time.Since(requestStarted).Milliseconds(),
+			ErrorCode:    "no_choices",
+		})
 		return "", true, errors.New("translation response has no choices")
 	}
 	translated := strings.TrimSpace(response.Choices[0].Message.Content)
@@ -298,6 +373,22 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 			"response_preview":           responsePreview,
 		})
 		// #endregion
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "translation",
+			ProviderName: "llm",
+			ModelName:    t.cfg.ModelName,
+			SourceLang:   sourceLang,
+			TargetLang:   targetLang,
+			InputChars:   len(text),
+			OutputChars:  0,
+			InputTokens:  usage.InputTokens,
+			OutputTokens: usage.OutputTokens,
+			TotalTokens:  usage.TotalTokens,
+			UsageSource:  usage.UsageSource,
+			Status:       "error",
+			DurationMS:   time.Since(requestStarted).Milliseconds(),
+			ErrorCode:    "empty_text",
+		})
 		return "", true, errors.New("translation response is empty")
 	}
 	// #region agent log
@@ -309,6 +400,21 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 		"output_len":    len(translated),
 	})
 	// #endregion
+	emitUsageEvent(ctx, UsageEvent{
+		Operation:    "translation",
+		ProviderName: "llm",
+		ModelName:    t.cfg.ModelName,
+		SourceLang:   sourceLang,
+		TargetLang:   targetLang,
+		InputChars:   len(text),
+		OutputChars:  len(translated),
+		InputTokens:  usage.InputTokens,
+		OutputTokens: usage.OutputTokens,
+		TotalTokens:  usage.TotalTokens,
+		UsageSource:  usage.UsageSource,
+		Status:       "success",
+		DurationMS:   time.Since(requestStarted).Milliseconds(),
+	})
 	return translated, false, nil
 }
 
@@ -520,6 +626,7 @@ func translateDocument(ctx context.Context, source Document, targetLang string, 
 	if sourceLang == "" {
 		sourceLang = "en"
 	}
+	ctx = WithUsageDocumentID(ctx, source.ID)
 	translationTask := startTranslateTask("translate_document", map[string]any{
 		"document_id": source.ID,
 		"source_path": source.SourcePath,

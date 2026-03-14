@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"civika/backend/config"
@@ -72,6 +75,7 @@ func runIndex(cfg config.Config, args []string) error {
 
 	ctx, cancel := indexContextForMode(cfg.RAG.Mode, cfg.RAG.IndexTimeout)
 	defer cancel()
+	indexRunID := newRAGIndexRunID()
 
 	ingestTask := startIndexTask("ingest_corpus", map[string]any{
 		"max_file_bytes": *maxFileBytes,
@@ -93,6 +97,13 @@ func runIndex(cfg config.Config, args []string) error {
 		return err
 	}
 	defer store.Close()
+	usageCollector := newIndexUsageCollector(store)
+	ctx = rag.WithUsageScope(ctx, rag.UsageScope{
+		Flow:  "rag_index",
+		Mode:  cfg.RAG.Mode,
+		RunID: indexRunID,
+	})
+	ctx = rag.WithUsageEmitter(ctx, usageCollector.Emit)
 
 	initSchemaTask := startIndexTask("init_schema", nil)
 	if err := store.InitSchema(ctx); err != nil {
@@ -215,9 +226,10 @@ func runIndex(cfg config.Config, args []string) error {
 		})
 		var vectors [][]float32
 		embeddingStartedAt := time.Now()
+		documentCtx := rag.WithUsageDocumentID(ctx, docID)
 		err = runWithHeartbeat(ctx, 30*time.Second, "rag-cli: embeddings en cours... (toujours actif)", func() error {
 			var embedErr error
-			vectors, embedErr = embedder.EmbedTexts(ctx, texts)
+			vectors, embedErr = embedder.EmbedTexts(documentCtx, texts)
 			return embedErr
 		})
 		totalEmbeddingDuration += time.Since(embeddingStartedAt)
@@ -259,6 +271,33 @@ func runIndex(cfg config.Config, args []string) error {
 		totalUpsertDuration += time.Since(upsertStartedAt)
 		upsertTask.Done(nil)
 		totalChunks += len(chunks)
+		collectorSnapshot := usageCollector.SnapshotDocument(docID)
+		chunkTokenSum := sumChunkTokens(chunks)
+		sourceDoc := pickSourceDocumentForMetrics(documentGroup, cfg.RAG.DefaultLanguage)
+		if err := store.UpsertIndexDocumentMetrics(ctx, rag.UsageDocumentMetrics{
+			RunID:                   indexRunID,
+			DocumentID:              docID,
+			SourceLang:              sourceDoc.Language,
+			SourceContentChars:      len(sourceDoc.Content),
+			TitleChars:              len(sourceDoc.Title),
+			TranslationsAttempted:   collectorSnapshot.TranslationsAttempted,
+			TranslationsSucceeded:   collectorSnapshot.TranslationsSucceeded,
+			ChunksCount:             len(chunks),
+			ChunksTokensSum:         chunkTokenSum,
+			EmbeddingCalls:          collectorSnapshot.EmbeddingCalls,
+			EmbeddingInputCharsSum:  collectorSnapshot.EmbeddingInputCharsSum,
+			EmbeddingInputTokensSum: collectorSnapshot.EmbeddingInputTokensSum,
+			EmbeddingTotalTokensSum: collectorSnapshot.EmbeddingTotalTokensSum,
+			LLMInputTokensSum:       collectorSnapshot.LLMInputTokensSum,
+			LLMOutputTokensSum:      collectorSnapshot.LLMOutputTokensSum,
+			LLMTotalTokensSum:       collectorSnapshot.LLMTotalTokensSum,
+			Status:                  "success",
+			IndexedAtUTC:            time.Now().UTC(),
+		}); err != nil {
+			documentTask.Fail(err, map[string]any{"phase": "upsert_document_metrics"})
+			indexTask.Fail(err, map[string]any{"phase": "upsert_document_metrics", "document_id": docID})
+			return fmt.Errorf("upsert document metrics %s: %w", docID, err)
+		}
 		documentTask.Done(map[string]any{
 			"document_id": docID,
 			"chunks":      len(chunks),
@@ -416,6 +455,147 @@ func indexContextForMode(mode string, configuredTimeout time.Duration) (context.
 	// En mode LLM, pas de deadline globale implicite; les timeouts de requete
 	// (traduction/embeddings) restent responsables de la protection reseau.
 	return context.WithCancel(context.Background())
+}
+
+type indexDocumentUsageSnapshot struct {
+	TranslationsAttempted   int
+	TranslationsSucceeded   int
+	EmbeddingCalls          int
+	EmbeddingInputCharsSum  int
+	EmbeddingInputTokensSum int
+	EmbeddingTotalTokensSum int
+	LLMInputTokensSum       int
+	LLMOutputTokensSum      int
+	LLMTotalTokensSum       int
+}
+
+type indexDocumentUsageAccumulator struct {
+	embeddingCalls          int
+	embeddingInputCharsSum  int
+	embeddingInputTokensSum int
+	embeddingTotalTokensSum int
+	llmInputTokensSum       int
+	llmOutputTokensSum      int
+	llmTotalTokensSum       int
+	attemptedTargets        map[string]struct{}
+	succeededTargets        map[string]struct{}
+}
+
+type indexUsageCollector struct {
+	mu         sync.Mutex
+	writer     rag.UsageMetricsWriter
+	byDocument map[string]*indexDocumentUsageAccumulator
+}
+
+func newIndexUsageCollector(writer rag.UsageMetricsWriter) *indexUsageCollector {
+	return &indexUsageCollector{
+		writer:     writer,
+		byDocument: map[string]*indexDocumentUsageAccumulator{},
+	}
+}
+
+func (c *indexUsageCollector) Emit(ctx context.Context, event rag.UsageEvent) {
+	if c.writer != nil {
+		if err := c.writer.RecordUsageEvent(ctx, event); err != nil {
+			log.Printf("rag-cli usage metrics write error: %v", err)
+		}
+	}
+	docID := strings.TrimSpace(event.DocumentID)
+	if docID == "" {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	acc, ok := c.byDocument[docID]
+	if !ok {
+		acc = &indexDocumentUsageAccumulator{
+			attemptedTargets: map[string]struct{}{},
+			succeededTargets: map[string]struct{}{},
+		}
+		c.byDocument[docID] = acc
+	}
+	switch event.Operation {
+	case "embedding":
+		acc.embeddingCalls++
+		acc.embeddingInputCharsSum += maxInt(event.InputChars, 0)
+		acc.embeddingInputTokensSum += maxInt(event.InputTokens, 0)
+		acc.embeddingTotalTokensSum += maxInt(event.TotalTokens, 0)
+	case "translation":
+		acc.llmInputTokensSum += maxInt(event.InputTokens, 0)
+		acc.llmOutputTokensSum += maxInt(event.OutputTokens, 0)
+		acc.llmTotalTokensSum += maxInt(event.TotalTokens, 0)
+		target := strings.TrimSpace(event.TargetLang)
+		source := strings.TrimSpace(event.SourceLang)
+		if target != "" && target != source {
+			acc.attemptedTargets[target] = struct{}{}
+			if strings.TrimSpace(event.Status) == "success" {
+				acc.succeededTargets[target] = struct{}{}
+			}
+		}
+	}
+}
+
+func (c *indexUsageCollector) SnapshotDocument(documentID string) indexDocumentUsageSnapshot {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	acc, ok := c.byDocument[strings.TrimSpace(documentID)]
+	if !ok {
+		return indexDocumentUsageSnapshot{}
+	}
+	return indexDocumentUsageSnapshot{
+		TranslationsAttempted:   len(acc.attemptedTargets),
+		TranslationsSucceeded:   len(acc.succeededTargets),
+		EmbeddingCalls:          acc.embeddingCalls,
+		EmbeddingInputCharsSum:  acc.embeddingInputCharsSum,
+		EmbeddingInputTokensSum: acc.embeddingInputTokensSum,
+		EmbeddingTotalTokensSum: acc.embeddingTotalTokensSum,
+		LLMInputTokensSum:       acc.llmInputTokensSum,
+		LLMOutputTokensSum:      acc.llmOutputTokensSum,
+		LLMTotalTokensSum:       acc.llmTotalTokensSum,
+	}
+}
+
+func pickSourceDocumentForMetrics(documents []rag.Document, defaultLang string) rag.Document {
+	normalizedDefault := strings.ToLower(strings.TrimSpace(defaultLang))
+	if normalizedDefault != "" {
+		for _, doc := range documents {
+			if strings.ToLower(strings.TrimSpace(doc.Language)) == normalizedDefault {
+				return doc
+			}
+		}
+	}
+	for _, doc := range documents {
+		if strings.ToLower(strings.TrimSpace(doc.Language)) == "fr" {
+			return doc
+		}
+	}
+	if len(documents) > 0 {
+		return documents[0]
+	}
+	return rag.Document{}
+}
+
+func sumChunkTokens(chunks []rag.Chunk) int {
+	total := 0
+	for _, chunk := range chunks {
+		total += maxInt(chunk.TokenCount, 0)
+	}
+	return total
+}
+
+func newRAGIndexRunID() string {
+	raw := make([]byte, 8)
+	if _, err := rand.Read(raw); err != nil {
+		return fmt.Sprintf("rag-index-%d", time.Now().UnixNano())
+	}
+	return fmt.Sprintf("rag-index-%d-%s", time.Now().UTC().Unix(), hex.EncodeToString(raw))
+}
+
+func maxInt(value int, fallback int) int {
+	if value < fallback {
+		return fallback
+	}
+	return value
 }
 
 func runQuery(cfg config.Config, args []string) error {

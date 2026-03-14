@@ -275,6 +275,9 @@ CREATE TABLE IF NOT EXISTS %s (
 	if _, err := s.db.ExecContext(ctx, createChunkFilterIndex); err != nil {
 		return fmt.Errorf("create rag filter index: %w", err)
 	}
+	if err := s.initUsageSchema(ctx); err != nil {
+		return err
+	}
 	return nil
 }
 

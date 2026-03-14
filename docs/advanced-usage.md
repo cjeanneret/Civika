@@ -27,6 +27,22 @@
   - `cd backend && go run ./cmd/rag-cli query --q "Quel est l'impact principal de la votation ?"`
   - ou `make rag-query Q="Quel est l'impact principal de la votation ?"`
 
+## Métriques de tokens (sans coût)
+- Les appels IA persistés sont stockés dans :
+  - `ai_usage_events` (événements détaillés),
+  - `ai_usage_daily_agg` (agrégats journaliers),
+  - `rag_index_document_metrics` (synthèse par document indexé).
+- Endpoint d'export JSON :
+  - `GET /api/v1/metrics/ai-usage?granularity=day`
+  - `GET /api/v1/metrics/ai-usage?granularity=event&flow=qa_query&operation=summarization&limit=100`
+- Filtres pris en charge :
+  - `granularity=event|day`
+  - `from` / `to` (RFC3339)
+  - `flow=rag_index|qa_query`
+  - `operation=embedding|translation|summarization`
+  - `mode=local|llm`
+  - `limit` (1-1000), `offset` (>= 0)
+
 ## Réindexation obligatoire
 Toute modification de modèle d'embedding, de fournisseur, ou de dimensions (`RAG_EMBEDDING_DIMENSIONS`) impose une réindexation complète.
 

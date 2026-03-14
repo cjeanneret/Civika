@@ -94,18 +94,56 @@ func (e *LLMEmbedder) EmbedTexts(ctx context.Context, texts []string) ([][]float
 		req.Header.Set("Authorization", "Bearer "+e.cfg.APIKey)
 	}
 
+	requestStarted := time.Now()
 	res, err := e.client.Do(req)
 	if err != nil {
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "embedding",
+			ProviderName: "llm",
+			ModelName:    e.cfg.ModelName,
+			InputChars:   sumTextLengths(sanitized),
+			OutputChars:  0,
+			UsageSource:  "unknown",
+			Status:       "error",
+			DurationMS:   time.Since(requestStarted).Milliseconds(),
+			ErrorCode:    "request_failed",
+		})
 		return nil, fmt.Errorf("embeddings request failed: %w", err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "embedding",
+			ProviderName: "llm",
+			ModelName:    e.cfg.ModelName,
+			InputChars:   sumTextLengths(sanitized),
+			OutputChars:  0,
+			UsageSource:  "unknown",
+			Status:       "error",
+			DurationMS:   time.Since(requestStarted).Milliseconds(),
+			ErrorCode:    fmt.Sprintf("status_%d", res.StatusCode),
+		})
 		return nil, fmt.Errorf("embeddings request returned status %d", res.StatusCode)
 	}
 
 	responseBody, err := io.ReadAll(io.LimitReader(res.Body, 2*1024*1024))
 	if err != nil {
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "embedding",
+			ProviderName: "llm",
+			ModelName:    e.cfg.ModelName,
+			InputChars:   sumTextLengths(sanitized),
+			OutputChars:  0,
+			UsageSource:  "unknown",
+			Status:       "error",
+			DurationMS:   time.Since(requestStarted).Milliseconds(),
+			ErrorCode:    "read_failed",
+		})
 		return nil, fmt.Errorf("read embeddings response: %w", err)
+	}
+	usage, usageErr := ParseUsageFromResponseBody(responseBody)
+	if usageErr != nil {
+		usage = UsageEvent{UsageSource: "unknown"}
 	}
 
 	var response struct {
@@ -115,6 +153,20 @@ func (e *LLMEmbedder) EmbedTexts(ctx context.Context, texts []string) ([][]float
 		Embeddings [][]float32 `json:"embeddings"`
 	}
 	if err := json.Unmarshal(responseBody, &response); err != nil {
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "embedding",
+			ProviderName: "llm",
+			ModelName:    e.cfg.ModelName,
+			InputChars:   sumTextLengths(sanitized),
+			OutputChars:  0,
+			InputTokens:  usage.InputTokens,
+			OutputTokens: usage.OutputTokens,
+			TotalTokens:  usage.TotalTokens,
+			UsageSource:  usage.UsageSource,
+			Status:       "error",
+			DurationMS:   time.Since(requestStarted).Milliseconds(),
+			ErrorCode:    "decode_failed",
+		})
 		return nil, fmt.Errorf("decode embeddings response: %w", err)
 	}
 
@@ -126,8 +178,35 @@ func (e *LLMEmbedder) EmbedTexts(ctx context.Context, texts []string) ([][]float
 		out = append(out, item.Embedding)
 	}
 	if len(out) == 0 {
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "embedding",
+			ProviderName: "llm",
+			ModelName:    e.cfg.ModelName,
+			InputChars:   sumTextLengths(sanitized),
+			OutputChars:  0,
+			InputTokens:  usage.InputTokens,
+			OutputTokens: usage.OutputTokens,
+			TotalTokens:  usage.TotalTokens,
+			UsageSource:  usage.UsageSource,
+			Status:       "error",
+			DurationMS:   time.Since(requestStarted).Milliseconds(),
+			ErrorCode:    "empty_response",
+		})
 		return nil, errors.New("embeddings response is empty")
 	}
+	emitUsageEvent(ctx, UsageEvent{
+		Operation:    "embedding",
+		ProviderName: "llm",
+		ModelName:    e.cfg.ModelName,
+		InputChars:   sumTextLengths(sanitized),
+		OutputChars:  0,
+		InputTokens:  usage.InputTokens,
+		OutputTokens: usage.OutputTokens,
+		TotalTokens:  usage.TotalTokens,
+		UsageSource:  usage.UsageSource,
+		Status:       "success",
+		DurationMS:   time.Since(requestStarted).Milliseconds(),
+	})
 	return out, nil
 }
 
@@ -190,4 +269,12 @@ func hashToVector(text string, dimensions int) []float32 {
 		vector[i] = float32(scaled)
 	}
 	return vector
+}
+
+func sumTextLengths(texts []string) int {
+	total := 0
+	for _, text := range texts {
+		total += len(text)
+	}
+	return total
 }
