@@ -84,6 +84,11 @@ jobs:
       - name: Init pgvector schema
         run: make init-db
 
+      - name: Prepare local corpus fixtures
+        run: |
+          mkdir -p data/normalized/openparldata
+          cp tests/fixtures/normalized/openparldata/01-voting-101357.json data/normalized/openparldata/
+
       - name: Index RAG corpus
         run: make rag-index
 
