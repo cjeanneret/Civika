@@ -44,6 +44,8 @@ jobs:
     name: RAG smoke (sans DB)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
