@@ -20,6 +20,22 @@
   - `cd backend && go run ./cmd/rag-cli query --q "What is the main impact of this vote?"`
   - or `make rag-query Q="What is the main impact of this vote?"`
 
+## Token metrics (no cost)
+- Persisted AI usage metrics are stored in:
+  - `ai_usage_events` (detailed events),
+  - `ai_usage_daily_agg` (daily aggregates),
+  - `rag_index_document_metrics` (per-indexed-document summary).
+- JSON export endpoint:
+  - `GET /api/v1/metrics/ai-usage?granularity=day`
+  - `GET /api/v1/metrics/ai-usage?granularity=event&flow=qa_query&operation=summarization&limit=100`
+- Supported filters:
+  - `granularity=event|day`
+  - `from` / `to` (RFC3339)
+  - `flow=rag_index|qa_query`
+  - `operation=embedding|translation|summarization`
+  - `mode=local|llm`
+  - `limit` (1-1000), `offset` (>= 0)
+
 ## Mandatory re-index
 Any change to embedding model/provider/dimensions requires full re-indexing.
 

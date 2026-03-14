@@ -20,6 +20,22 @@
   - `cd backend && go run ./cmd/rag-cli query --q "Was ist die wichtigste Auswirkung dieser Abstimmung?"`
   - oder `make rag-query Q="Was ist die wichtigste Auswirkung dieser Abstimmung?"`
 
+## Token-Metriken (ohne Kosten)
+- Persistierte KI-Nutzungsmetriken werden gespeichert in:
+  - `ai_usage_events` (detaillierte Ereignisse),
+  - `ai_usage_daily_agg` (tägliche Aggregate),
+  - `rag_index_document_metrics` (Zusammenfassung pro indexiertem Dokument).
+- JSON-Export-Endpunkt:
+  - `GET /api/v1/metrics/ai-usage?granularity=day`
+  - `GET /api/v1/metrics/ai-usage?granularity=event&flow=qa_query&operation=summarization&limit=100`
+- Unterstützte Filter:
+  - `granularity=event|day`
+  - `from` / `to` (RFC3339)
+  - `flow=rag_index|qa_query`
+  - `operation=embedding|translation|summarization`
+  - `mode=local|llm`
+  - `limit` (1-1000), `offset` (>= 0)
+
 ## Pflicht zur Neuindexierung
 Jede Änderung an Embedding-Modell/Provider/Dimensionen erfordert eine vollständige Neuindexierung.
 

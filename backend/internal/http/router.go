@@ -2,10 +2,12 @@ package httpapi
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
 	"civika/backend/config"
+	"civika/backend/internal/rag"
 	"civika/backend/internal/security"
 	"civika/backend/internal/services"
 )
@@ -13,6 +15,7 @@ import (
 type RouterDependencies struct {
 	VotationService services.VotationService
 	QAService       services.QueryService
+	UsageMetrics    rag.UsageMetricsReader
 	APIVersion      string
 	RAGMode         string
 }
@@ -29,6 +32,7 @@ func NewRouter(cfg config.Config, deps RouterDependencies) http.Handler {
 	handlers := apiHandlers{
 		votationService: deps.VotationService,
 		qaService:       deps.QAService,
+		usageMetrics:    deps.UsageMetrics,
 		apiVersion:      deps.APIVersion,
 		ragMode:         deps.RAGMode,
 	}
@@ -44,7 +48,17 @@ func NewRouter(cfg config.Config, deps RouterDependencies) http.Handler {
 		api.Get("/objects/{objectId}/sources", handlers.listObjectSourcesHandler)
 		api.Get("/taxonomies", handlers.taxonomiesHandler)
 		api.With(qaRateLimitMiddleware(cfg)).Post("/qa/query", handlers.qaQueryHandler)
+		api.Get("/metrics/ai-usage", handlers.metricsUsageHandler)
 	})
 
 	return r
+}
+
+func isSafeMetricEnum(value string) bool {
+	switch strings.TrimSpace(value) {
+	case "", "event", "day", "rag_index", "qa_query", "embedding", "translation", "summarization", "local", "llm":
+		return true
+	default:
+		return false
+	}
 }

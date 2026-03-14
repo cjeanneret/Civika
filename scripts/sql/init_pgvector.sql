@@ -109,3 +109,80 @@ CREATE INDEX IF NOT EXISTS rag_chunks_doc_lang_idx
 
 CREATE INDEX IF NOT EXISTS rag_chunks_filters_idx
   ON rag_chunks (vote_date, level, canton, commune_code, status, votation_id, object_id);
+
+CREATE TABLE IF NOT EXISTS ai_usage_events (
+  event_id TEXT PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL,
+  flow TEXT NOT NULL,
+  operation TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  provider_name TEXT NOT NULL,
+  model_name TEXT NOT NULL,
+  run_id TEXT NOT NULL DEFAULT '',
+  request_id TEXT NOT NULL DEFAULT '',
+  document_id TEXT NOT NULL DEFAULT '',
+  source_lang TEXT NOT NULL DEFAULT '',
+  target_lang TEXT NOT NULL DEFAULT '',
+  input_chars INT NOT NULL DEFAULT 0,
+  output_chars INT NOT NULL DEFAULT 0,
+  input_tokens INT NOT NULL DEFAULT 0,
+  output_tokens INT NOT NULL DEFAULT 0,
+  total_tokens INT NOT NULL DEFAULT 0,
+  usage_source TEXT NOT NULL DEFAULT 'unknown',
+  status TEXT NOT NULL,
+  duration_ms BIGINT NOT NULL DEFAULT 0,
+  error_code TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS ai_usage_events_created_at_idx
+  ON ai_usage_events (created_at DESC);
+
+CREATE INDEX IF NOT EXISTS ai_usage_events_flow_op_idx
+  ON ai_usage_events (flow, operation, mode, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS ai_usage_daily_agg (
+  day DATE NOT NULL,
+  flow TEXT NOT NULL,
+  operation TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  model_name TEXT NOT NULL,
+  provider_name TEXT NOT NULL,
+  events_count BIGINT NOT NULL DEFAULT 0,
+  success_count BIGINT NOT NULL DEFAULT 0,
+  error_count BIGINT NOT NULL DEFAULT 0,
+  input_chars_sum BIGINT NOT NULL DEFAULT 0,
+  output_chars_sum BIGINT NOT NULL DEFAULT 0,
+  input_tokens_sum BIGINT NOT NULL DEFAULT 0,
+  output_tokens_sum BIGINT NOT NULL DEFAULT 0,
+  total_tokens_sum BIGINT NOT NULL DEFAULT 0,
+  duration_ms_sum BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, flow, operation, mode, model_name, provider_name)
+);
+
+CREATE INDEX IF NOT EXISTS ai_usage_daily_agg_day_idx
+  ON ai_usage_daily_agg (day DESC);
+
+CREATE TABLE IF NOT EXISTS rag_index_document_metrics (
+  run_id TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  source_lang TEXT NOT NULL DEFAULT '',
+  source_content_chars INT NOT NULL DEFAULT 0,
+  title_chars INT NOT NULL DEFAULT 0,
+  translations_attempted INT NOT NULL DEFAULT 0,
+  translations_succeeded INT NOT NULL DEFAULT 0,
+  chunks_count INT NOT NULL DEFAULT 0,
+  chunks_tokens_sum INT NOT NULL DEFAULT 0,
+  embedding_calls INT NOT NULL DEFAULT 0,
+  embedding_input_chars_sum INT NOT NULL DEFAULT 0,
+  embedding_input_tokens_sum INT NOT NULL DEFAULT 0,
+  embedding_total_tokens_sum INT NOT NULL DEFAULT 0,
+  llm_input_tokens_sum INT NOT NULL DEFAULT 0,
+  llm_output_tokens_sum INT NOT NULL DEFAULT 0,
+  llm_total_tokens_sum INT NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'unknown',
+  indexed_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (run_id, document_id)
+);
+
+CREATE INDEX IF NOT EXISTS rag_index_document_metrics_indexed_at_idx
+  ON rag_index_document_metrics (indexed_at DESC);

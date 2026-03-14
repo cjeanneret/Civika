@@ -164,16 +164,53 @@ func (s *LLMSummarizer) Summarize(ctx context.Context, question string, hits []S
 	})
 	// #endregion
 	if err != nil {
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "summarization",
+			ProviderName: "llm",
+			ModelName:    s.cfg.ModelName,
+			InputChars:   len(prompt),
+			OutputChars:  0,
+			UsageSource:  "unknown",
+			Status:       "error",
+			DurationMS:   time.Since(requestStart).Milliseconds(),
+			ErrorCode:    "request_failed",
+		})
 		return "", fmt.Errorf("summarize request failed: %w", err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "summarization",
+			ProviderName: "llm",
+			ModelName:    s.cfg.ModelName,
+			InputChars:   len(prompt),
+			OutputChars:  0,
+			UsageSource:  "unknown",
+			Status:       "error",
+			DurationMS:   time.Since(requestStart).Milliseconds(),
+			ErrorCode:    fmt.Sprintf("status_%d", res.StatusCode),
+		})
 		return "", fmt.Errorf("summarize request returned status %d", res.StatusCode)
 	}
 
 	responseBody, err := io.ReadAll(io.LimitReader(res.Body, 2*1024*1024))
 	if err != nil {
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "summarization",
+			ProviderName: "llm",
+			ModelName:    s.cfg.ModelName,
+			InputChars:   len(prompt),
+			OutputChars:  0,
+			UsageSource:  "unknown",
+			Status:       "error",
+			DurationMS:   time.Since(requestStart).Milliseconds(),
+			ErrorCode:    "read_failed",
+		})
 		return "", fmt.Errorf("read summarize response: %w", err)
+	}
+	usage, usageErr := ParseUsageFromResponseBody(responseBody)
+	if usageErr != nil {
+		usage = UsageEvent{UsageSource: "unknown"}
 	}
 
 	var response struct {
@@ -185,9 +222,37 @@ func (s *LLMSummarizer) Summarize(ctx context.Context, question string, hits []S
 		} `json:"choices"`
 	}
 	if err := json.Unmarshal(responseBody, &response); err != nil {
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "summarization",
+			ProviderName: "llm",
+			ModelName:    s.cfg.ModelName,
+			InputChars:   len(prompt),
+			OutputChars:  0,
+			InputTokens:  usage.InputTokens,
+			OutputTokens: usage.OutputTokens,
+			TotalTokens:  usage.TotalTokens,
+			UsageSource:  usage.UsageSource,
+			Status:       "error",
+			DurationMS:   time.Since(requestStart).Milliseconds(),
+			ErrorCode:    "decode_failed",
+		})
 		return "", fmt.Errorf("decode summarize response: %w", err)
 	}
 	if len(response.Choices) == 0 {
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "summarization",
+			ProviderName: "llm",
+			ModelName:    s.cfg.ModelName,
+			InputChars:   len(prompt),
+			OutputChars:  0,
+			InputTokens:  usage.InputTokens,
+			OutputTokens: usage.OutputTokens,
+			TotalTokens:  usage.TotalTokens,
+			UsageSource:  usage.UsageSource,
+			Status:       "error",
+			DurationMS:   time.Since(requestStart).Milliseconds(),
+			ErrorCode:    "no_choices",
+		})
 		return "", errors.New("summarize response has no choices")
 	}
 
@@ -196,8 +261,35 @@ func (s *LLMSummarizer) Summarize(ctx context.Context, question string, hits []S
 		summary = strings.TrimSpace(response.Choices[0].Text)
 	}
 	if summary == "" {
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "summarization",
+			ProviderName: "llm",
+			ModelName:    s.cfg.ModelName,
+			InputChars:   len(prompt),
+			OutputChars:  0,
+			InputTokens:  usage.InputTokens,
+			OutputTokens: usage.OutputTokens,
+			TotalTokens:  usage.TotalTokens,
+			UsageSource:  usage.UsageSource,
+			Status:       "error",
+			DurationMS:   time.Since(requestStart).Milliseconds(),
+			ErrorCode:    "empty_summary",
+		})
 		return "", errors.New("summarize response is empty")
 	}
+	emitUsageEvent(ctx, UsageEvent{
+		Operation:    "summarization",
+		ProviderName: "llm",
+		ModelName:    s.cfg.ModelName,
+		InputChars:   len(prompt),
+		OutputChars:  len(summary),
+		InputTokens:  usage.InputTokens,
+		OutputTokens: usage.OutputTokens,
+		TotalTokens:  usage.TotalTokens,
+		UsageSource:  usage.UsageSource,
+		Status:       "success",
+		DurationMS:   time.Since(requestStart).Milliseconds(),
+	})
 	return summary, nil
 }
 

@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"civika/backend/config"
+	"civika/backend/internal/rag"
 	"civika/backend/internal/services"
 )
 
@@ -54,6 +57,65 @@ func (f fakeQAService) Query(_ context.Context, _ services.QAQueryInput) (servic
 	return services.QAQueryOutput{Answer: "ok", Language: "fr"}, nil
 }
 
+type fakeUsageMetrics struct{}
+
+func (f fakeUsageMetrics) ListUsageEvents(_ context.Context, _ rag.UsageListFilter) ([]rag.UsageEventRow, error) {
+	return []rag.UsageEventRow{
+		{
+			EventID:      "evt-1",
+			CreatedAtUTC: time.Now().UTC().Format(time.RFC3339),
+			Flow:         "qa_query",
+			Operation:    "summarization",
+			Mode:         "llm",
+		},
+	}, nil
+}
+
+func (f fakeUsageMetrics) ListUsageDailyAggregates(_ context.Context, _ rag.UsageListFilter) ([]rag.UsageDailyAggregate, error) {
+	return []rag.UsageDailyAggregate{
+		{
+			Day:            "2026-03-14",
+			Flow:           "qa_query",
+			Operation:      "summarization",
+			Mode:           "llm",
+			TotalTokensSum: 100,
+		},
+	}, nil
+}
+
+type captureUsageMetrics struct {
+	lastEventFilter *rag.UsageListFilter
+	lastDayFilter   *rag.UsageListFilter
+}
+
+func (c *captureUsageMetrics) ListUsageEvents(_ context.Context, filter rag.UsageListFilter) ([]rag.UsageEventRow, error) {
+	cloned := filter
+	c.lastEventFilter = &cloned
+	return []rag.UsageEventRow{
+		{
+			EventID:      "evt-capture-1",
+			CreatedAtUTC: time.Now().UTC().Format(time.RFC3339),
+			Flow:         "qa_query",
+			Operation:    "embedding",
+			Mode:         "llm",
+		},
+	}, nil
+}
+
+func (c *captureUsageMetrics) ListUsageDailyAggregates(_ context.Context, filter rag.UsageListFilter) ([]rag.UsageDailyAggregate, error) {
+	cloned := filter
+	c.lastDayFilter = &cloned
+	return []rag.UsageDailyAggregate{
+		{
+			Day:            "2026-03-14",
+			Flow:           "rag_index",
+			Operation:      "translation",
+			Mode:           "llm",
+			TotalTokensSum: 10,
+		},
+	}, nil
+}
+
 type captureLangVotationService struct {
 	lastLang string
 }
@@ -88,6 +150,18 @@ func buildRouterForTest(votationSvc services.VotationService, qaSvc services.Que
 	return NewRouter(cfg, RouterDependencies{
 		VotationService: votationSvc,
 		QAService:       qaSvc,
+		UsageMetrics:    fakeUsageMetrics{},
+		APIVersion:      "v1",
+		RAGMode:         "local",
+	})
+}
+
+func buildRouterForMetricsTest(metrics rag.UsageMetricsReader) http.Handler {
+	cfg := config.LoadFromEnv()
+	return NewRouter(cfg, RouterDependencies{
+		VotationService: fakeVotationService{},
+		QAService:       fakeQAService{},
+		UsageMetrics:    metrics,
 		APIVersion:      "v1",
 		RAGMode:         "local",
 	})
@@ -206,5 +280,161 @@ func TestGetVotationPassesLangFromQuery(t *testing.T) {
 	}
 	if votationSvc.lastLang != "it" {
 		t.Fatalf("expected language it to be passed through, got %q", votationSvc.lastLang)
+	}
+}
+
+func TestMetricsUsageDay(t *testing.T) {
+	router := buildRouterForTest(fakeVotationService{}, fakeQAService{})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics/ai-usage?granularity=day&limit=10", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("expected valid json, got error: %v", err)
+	}
+	if payload["granularity"] != "day" {
+		t.Fatalf("expected granularity day, got %v", payload["granularity"])
+	}
+}
+
+func TestMetricsUsageRejectsInvalidGranularity(t *testing.T) {
+	router := buildRouterForTest(fakeVotationService{}, fakeQAService{})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics/ai-usage?granularity=month", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestMetricsUsageDefaultsToDayGranularity(t *testing.T) {
+	metrics := &captureUsageMetrics{}
+	router := buildRouterForMetricsTest(metrics)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics/ai-usage", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if metrics.lastDayFilter == nil {
+		t.Fatalf("expected daily aggregate reader to be called")
+	}
+	if metrics.lastEventFilter != nil {
+		t.Fatalf("did not expect event reader to be called")
+	}
+}
+
+func TestMetricsUsageEventPropagatesFilters(t *testing.T) {
+	metrics := &captureUsageMetrics{}
+	router := buildRouterForMetricsTest(metrics)
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/metrics/ai-usage?granularity=event&from=2026-03-01T00:00:00Z&to=2026-03-10T00:00:00Z&flow=qa_query&operation=embedding&mode=llm&limit=9&offset=2",
+		nil,
+	)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if metrics.lastEventFilter == nil {
+		t.Fatalf("expected event reader to be called")
+	}
+	filter := metrics.lastEventFilter
+	if filter.Flow != "qa_query" || filter.Operation != "embedding" || filter.Mode != "llm" {
+		t.Fatalf("unexpected filter values: %#v", *filter)
+	}
+	if filter.Limit != 9 || filter.Offset != 2 {
+		t.Fatalf("unexpected pagination values: %#v", *filter)
+	}
+	if filter.FromUTC == nil || filter.ToUTC == nil {
+		t.Fatalf("expected from/to to be parsed")
+	}
+}
+
+func TestMetricsUsageRejectsInvalidFilters(t *testing.T) {
+	testCases := []struct {
+		name string
+		url  string
+	}{
+		{
+			name: "invalid limit lower bound",
+			url:  "/api/v1/metrics/ai-usage?granularity=event&limit=0",
+		},
+		{
+			name: "invalid limit upper bound",
+			url:  "/api/v1/metrics/ai-usage?granularity=event&limit=1001",
+		},
+		{
+			name: "invalid offset",
+			url:  "/api/v1/metrics/ai-usage?granularity=event&offset=-2",
+		},
+		{
+			name: "invalid flow",
+			url:  "/api/v1/metrics/ai-usage?granularity=event&flow=other",
+		},
+		{
+			name: "invalid operation",
+			url:  "/api/v1/metrics/ai-usage?granularity=event&operation=chat",
+		},
+		{
+			name: "invalid mode",
+			url:  "/api/v1/metrics/ai-usage?granularity=event&mode=hybrid",
+		},
+		{
+			name: "invalid from",
+			url:  "/api/v1/metrics/ai-usage?granularity=event&from=2026-03-10",
+		},
+		{
+			name: "invalid to",
+			url:  "/api/v1/metrics/ai-usage?granularity=event&to=invalid",
+		},
+		{
+			name: "from after to",
+			url:  "/api/v1/metrics/ai-usage?granularity=event&from=2026-03-11T00:00:00Z&to=2026-03-10T00:00:00Z",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			router := buildRouterForTest(fakeVotationService{}, fakeQAService{})
+			req := httptest.NewRequest(http.MethodGet, tc.url, nil)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d", rec.Code)
+			}
+			var payload apiError
+			if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("expected API error JSON: %v", err)
+			}
+			if payload.Code != "invalid_query" {
+				t.Fatalf("expected invalid_query code, got %q", payload.Code)
+			}
+		})
+	}
+}
+
+func TestMetricsUsageErrorMessageDoesNotEchoRawDateInput(t *testing.T) {
+	router := buildRouterForTest(fakeVotationService{}, fakeQAService{})
+	rawInput := "not-a-date-with-private-fragment-123"
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/metrics/ai-usage?granularity=event&from="+rawInput,
+		nil,
+	)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+	var payload apiError
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("expected API error JSON: %v", err)
+	}
+	if strings.Contains(payload.Message, rawInput) {
+		t.Fatalf("error message should not echo raw input, got %q", payload.Message)
 	}
 }
