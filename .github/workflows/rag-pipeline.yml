@@ -84,8 +84,27 @@ jobs:
       - name: Init pgvector schema
         run: make init-db
 
+      - name: Prepare local corpus fixtures
+        run: |
+          mkdir -p data/normalized/openparldata
+          cp tests/fixtures/normalized/openparldata/01-voting-101357.json data/normalized/openparldata/
+
       - name: Index RAG corpus
+        env:
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: "5432"
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: replace-me
+          POSTGRES_DB: civika
+          POSTGRES_SSLMODE: disable
         run: make rag-index
 
       - name: Run RAG query
+        env:
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: "5432"
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: replace-me
+          POSTGRES_DB: civika
+          POSTGRES_SSLMODE: disable
         run: make rag-query Q="Quels sont les arguments principaux de cette votation ?"
