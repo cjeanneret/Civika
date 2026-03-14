@@ -1,0 +1,132 @@
+---
+description: Cadre projet Civika (objectif, architecture, sécurité, qualité)
+alwaysApply: true
+---
+
+# Règle Projet Civika
+
+## Contexte
+- Nom: `Civika`.
+- Objectif: aider à comprendre l'impact des votations en Suisse.
+- Produit: application web publique avec backend Go et frontend TypeScript.
+- Priorité absolue: sécurité dès le PoC.
+
+## Objectifs du PoC
+- Construire un PoC minimal, propre et sécurisé.
+- Backend API en Go pour:
+  - ingestion de données de votations (sources officielles ou de test),
+  - modélisation des objets (`Votation`, `Question`, `Option`, `Résultat`, `Scénario d'impact`),
+  - endpoints HTTP publics: liste, détail, scénarios d'impact.
+- Frontend TypeScript pour visualiser les votations et impacts.
+- Exclure temporairement les fonctionnalités risquées (commentaires libres, uploads).
+
+## Hors périmètre (pour l'instant)
+- Authentification complexe, comptes utilisateurs, sessions persistantes.
+- RBAC avancé.
+- Optimisations de performance/scaling.
+- Design UI avancé.
+
+## Stack et structure
+- Backend:
+  - Go stable récent.
+  - `net/http` ou routeur minimal (`chi` acceptable si justifié).
+- Frontend:
+  - TypeScript strict.
+  - Framework SSR moderne (ex: Next.js).
+- Infra:
+  - monorepo,
+  - Dockerfile backend + frontend,
+  - `docker-compose` pour le dev local.
+- Structure backend recommandée:
+  - `backend/cmd/civika-api/main.go`
+  - `backend/internal/domain`
+  - `backend/internal/services`
+  - `backend/internal/http`
+  - `backend/internal/security`
+  - `backend/internal/ai`
+  - `backend/config`
+- Séparation stricte des couches:
+  - validation/parsing HTTP,
+  - logique métier,
+  - accès données,
+  - appels externes (LLM, etc.).
+
+## Exigences sécurité backend
+- Valider toutes les entrées (`body`, query params, path params) avant la logique métier.
+- Limiter la taille des bodies (`http.MaxBytesReader` ou équivalent).
+- Utiliser des structs + validation explicite (longueur, format, valeurs autorisées).
+- Ne jamais exposer de stack traces ni de détails internes en réponse HTTP.
+- Journalisation contrôlée: ne jamais logguer secrets/tokens/données sensibles en clair.
+- Ajouter des headers via middleware dès le PoC:
+  - `X-Content-Type-Options: nosniff`
+  - `X-Frame-Options: DENY`
+  - `Referrer-Policy` conservatrice
+  - CSP minimale adaptée au front.
+- JSON:
+  - utiliser `json.Encoder` / `json.Decoder`,
+  - servir `Content-Type: application/json; charset=utf-8`.
+
+## Exigences sécurité frontend
+- TypeScript strict activé, sans `any` implicites.
+- Types partagés pour les payloads API afin d'éviter les divergences backend/frontend.
+- XSS:
+  - rendu textuel par défaut,
+  - éviter `dangerouslySetInnerHTML` sauf cas très contrôlé.
+- Entrées utilisateur: strict minimum pour le PoC, sans exécution de contenu fourni.
+
+## IA / LLM
+- Créer `backend/internal/ai` avec:
+  - interface `ImpactExplainer` (`ExplainImpact(ctx, input) (output, error)`),
+  - `MockImpactExplainer` déterministe sans réseau,
+  - `LLMImpactExplainer` (appel HTTP externe).
+- Configuration LLM via variables d'environnement ou fichier de config:
+  - `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL_NAME`, timeouts, limites.
+- Interdiction de hardcoder des secrets.
+- Sécurité des appels LLM:
+  - timeout réseau obligatoire,
+  - limite de taille de prompt,
+  - logs sûrs (sans token/donnée sensible),
+  - validation/sanitation des réponses avant retour frontend.
+
+## RAG / Modes d'exécution (local vs LLM distant)
+- Le pipeline RAG doit fonctionner dans un mode explicite, sans mélange implicite:
+  - mode `local` (déterministe, sans appel réseau),
+  - mode `llm` (embeddings/résumé via API externe).
+- La sélection du mode se fait uniquement par configuration explicite (variables/env), jamais par heuristique.
+- Interdiction de fallback silencieux:
+  - si le mode `llm` est activé mais mal configuré ou indisponible, retourner une erreur explicite;
+  - ne pas basculer automatiquement vers `local` sans signal clair.
+- Cohérence obligatoire des embeddings:
+  - la dimension du vecteur (`RAG_EMBEDDING_DIMENSIONS`) doit correspondre au modèle d'embedding choisi;
+  - tout changement de modèle/dimension impose une réindexation complète.
+- Interdiction de mélanger plusieurs familles d'embeddings dans la même table/index actif.
+- Journalisation:
+  - autorisé: mode actif (`local`/`llm`), modèle utilisé, métadonnées techniques;
+  - interdit: tokens API, prompts complets, contenu sensible.
+- Documentation requise dans `README.md`:
+  - mode par défaut,
+  - variables à définir,
+  - procédure de bascule de mode,
+  - procédure de réindexation.
+
+## Plans, tests et qualité
+- Règle de planification à appliquer: `.cursor/rules/plans.mdc`.
+- Tests unitaires requis:
+  - validation d'entrée,
+  - logique métier critique,
+  - gestion d'erreurs mock/LLM.
+- Tests d'intégration requis sur les endpoints clés, incluant cas d'erreur.
+- Lint minimal:
+  - backend: `go vet` / `golangci-lint`,
+  - frontend: ESLint + TypeScript strict.
+- Le `README.md` doit couvrir:
+  - lancement local,
+  - configuration LLM,
+  - principes de sécurité appliqués.
+
+## Principes généraux
+- Privilégier la simplicité plutôt que l'abstraction prématurée.
+- Préférer des types explicites et des fonctions courtes.
+- À chaque nouvelle surface d'entrée (champ, paramètre, appel LLM):
+  - analyser les risques (`injection`, `XSS`, `DoS`, fuite de données),
+  - ajouter au minimum une validation et un test associé.

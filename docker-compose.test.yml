@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-civika_test}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-civika-test-pass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-civika_test}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env.test
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - LLM_BASE_URL=http://host.docker.internal:11434
+      - LLM_EMBEDDING_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    env_file:
+      - .env.test
+    environment:
+      - INTERNAL_API_BASE_URL=http://api:8080
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+  rag_chunker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    user: "0:0"
+    env_file:
+      - .env.test
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - LLM_BASE_URL=http://host.docker.internal:11434
+      - LLM_EMBEDDING_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - rag_data:/app/data
+    entrypoint: ["sh", "-c", "sleep infinity"]
+
+volumes:
+  postgres_test_data:
+  rag_data:

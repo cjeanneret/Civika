@@ -1,0 +1,28 @@
+---
+description: Standard des plans d'implémentation en Markdown GitHub
+alwaysApply: true
+---
+
+# Règle Plans (GitHub Markdown)
+
+## Emplacement obligatoire
+- Tout plan d'architecture, refactor ou implémentation doit être enregistré dans:
+  - `docs/plans/PLAN-YYYYMMDD-<slug>.md`
+- Le plan doit être créé ou mis à jour avant des modifications massives de code.
+
+## Format obligatoire
+- Utiliser le Markdown GitHub (titres, listes, checkboxes, blocs de code).
+- Utiliser des chemins relatifs au repo uniquement (jamais de chemins absolus machine).
+- Ajouter un diagramme Mermaid quand un flux technique ou une architecture est décrite.
+
+## Contenu minimal
+- Contexte.
+- Objectifs.
+- Décisions principales (technologies et choix structurants).
+- Arborescence cible.
+- Modifications de fichiers prévues.
+- Vérification post-génération (checklist exécutable).
+
+## Qualité
+- Plan concis, actionnable, sans logique métier détaillée.
+- Mention explicite des contraintes de sécurité impactées par la structure proposée.

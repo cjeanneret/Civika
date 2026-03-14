@@ -1,0 +1,104 @@
+---
+description: Sources de données externes autorisées et règles d'intégration
+alwaysApply: true
+---
+
+# Règle Data Sources (remote, officielles, ouvertes)
+
+## Objectif
+- Documenter explicitement les sources de données externes autorisées pour Civika.
+- Garantir la transparence pour les utilisateurs, la communauté et les audits.
+- Empêcher l'usage de sources inventées ou de scraping fragile lorsqu'une API ou un dataset structuré existe.
+
+## Principes généraux
+- Toujours préférer:
+  - les API/datasets documentés et stables,
+  - les portails open data officiels,
+  - plutôt que du scraping ad hoc.
+- Respecter les licences et conditions d'utilisation de chaque source.
+- Documenter dans le code, pour chaque intégration:
+  - la source exacte (URL, organisme émetteur),
+  - le schéma de données exploité,
+  - la politique de mise à jour (temps réel, batch, archives).
+
+## Sources principales (votations, élections)
+
+### 1) opendata.swiss (portail OGD)
+- URL de référence: `https://opendata.swiss/`
+- Usage autorisé:
+  - découverte et catalogage de datasets,
+  - identification de liens vers les producteurs de données (FSO, administration fédérale, cantons).
+- Règle:
+  - ne pas dépendre exclusivement du catalogue; suivre les ressources producteur lorsqu'elles sont disponibles.
+
+### 2) OFS/FSO (votations et élections)
+- Sources de référence:
+  - datasets et services référencés via `https://opendata.swiss/`,
+  - services statistiques et résultats officiels publiés par l'OFS.
+- Usage autorisé:
+  - récupérer les résultats agrégés (commune, district, canton),
+  - alimenter indicateurs, visualisations et comparaisons historiques.
+- Règles d'intégration:
+  - encapsuler l'accès dans un package dédié (ex: `backend/internal/datasources/ofs`),
+  - prévoir ingestion batch et cache local pour limiter la charge externe.
+
+### 3) abstimmungen.admin.ch (portail officiel des votations)
+- URL de référence: `https://abstimmungen.admin.ch/`
+- Usage autorisé:
+  - métadonnées éditoriales lisibles (titre, résumé, textes explicatifs).
+- Règles:
+  - si une source structurée équivalente existe (OFS/opendata), l'utiliser en priorité,
+  - si certains champs nécessitent du HTML, isoler le scraping dans un module dédié et testé.
+
+### 4) Swissvotes (historique des votations fédérales)
+- Source de référence:
+  - dataset Swissvotes (CSV/XLSX) publié par le projet de recherche.
+- Usage autorisé:
+  - analyses historiques long terme et enrichissement de contexte.
+- Règles:
+  - vérifier et documenter explicitement la licence,
+  - utiliser un pipeline ETL séparé avec versionning des données.
+
+## Sources parlementaires
+
+### 5) OpenParlData / Open Parl Data API
+- Sources de référence:
+  - `https://opendata.ch/projects/openparldata/`
+  - endpoint API officiel documenté par le projet.
+- Usage autorisé:
+  - relier votations, débats et positions parlementaires,
+  - produire des visualisations de comportements de vote.
+- Règles:
+  - utiliser l'API documentée en priorité,
+  - ne pas scraper des sites parlementaires individuels si l'API couvre le besoin,
+  - surveiller les évolutions du standard eCH et adapter le mapping de données.
+
+## Autres sources possibles (à documenter avant usage)
+- Sources d'information civique (ex: `https://www.ch.ch/`) si besoin métier explicite.
+- Projets civic tech tiers (ex: Smartmonitor, Lobbywatch) après validation API/licence.
+
+## Critères d'acceptation d'une nouvelle source
+- URL stable et propriétaire de la source clairement identifié.
+- Licence ou conditions d'usage compatibles avec le projet.
+- Schéma de données documenté et mappable vers le modèle Civika.
+- Stratégie de robustesse prévue:
+  - limitation de requêtes (rate limiting),
+  - cache local,
+  - tests d'intégration avec fixtures/mocks (sans dépendance live).
+
+## Règles d'implémentation
+- Chaque intégration externe doit:
+  - être encapsulée dans un package dédié (ex: `backend/internal/datasources/<source>`),
+  - mentionner dans le code la base URL, l'organisme responsable, la licence (si connue),
+  - définir timeouts et gestion d'erreurs explicites.
+- Aucune nouvelle source externe ne doit être intégrée sans:
+  - mise à jour de cette règle,
+  - documentation dans `docs/datasources/*.md` ou README associé.
+
+## Plans liés aux données
+- Lorsqu'une feature ou un refactor ajoute une source externe:
+  - documenter dans `docs/plans/PLAN-*.md`:
+    - la source ciblée,
+    - les endpoints/ressources utilisés,
+    - les champs extraits et leur mapping vers le modèle Civika.
+  - mettre à jour cette règle si le périmètre des sources évolue.

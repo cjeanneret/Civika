@@ -1,0 +1,111 @@
+{
+  "source_system": "openparldata",
+  "source_org": "OpenParlData.ch",
+  "fetched_at_utc": "2026-03-13T21:22:16Z",
+  "selection_strategy": "fallback_past",
+  "available_languages": [
+    "de"
+  ],
+  "voting": {
+    "id": 101357,
+    "url_api": "https://api.openparldata.ch/v1/votings/101357",
+    "body_key": "AG",
+    "external_id": "6847221_1",
+    "date": "2026-03-10T16:42:53",
+    "title": {
+      "de": "Abstimmung"
+    },
+    "affair_id": 256548,
+    "affair_title": {
+      "de": "Departementswechsel des Frauenhaus Aargau-Solothurn vom Departement Bildung, Kultur und Sport zum Departement Gesundheit und Soziales"
+    },
+    "meaning_of_yes": {
+      "de": "Für die Überweisung der Motion = Ja-Dagegen = Nein"
+    },
+    "meaning_of_no": {},
+    "links": {
+      "affairs": "https://api.openparldata.ch/v1/votings/101357/affairs"
+    }
+  },
+  "affair": {
+    "id": 256548,
+    "url_api": "",
+    "external_id": "6676668",
+    "title": {
+      "de": "Departementswechsel des Frauenhaus Aargau-Solothurn vom Departement Bildung, Kultur und Sport zum Departement Gesundheit und Soziales"
+    },
+    "title_long": {
+      "de": "Motion Mia Jenni, SP, Obersiggenthal (Sprecherin), Edith Saner, Mitte, Birmenstorf, Karin Koch Wick, Mitte, Bremgarten, Manuela Ernst, GLP, Wettingen, Ruth Müri, Grüne, Baden, Désirée Stutz, SVP, Möhlin, Therese Dietiker, EVP, Aarau, vom 23. September 2025 betreffend Departementswechsel des Frauenhaus Aargau-Solothurn vom Departement Bildung, Kultur und Sport zum Departement Gesundheit und Soziales"
+    },
+    "type_name": {
+      "de": "Motion"
+    },
+    "state_name": {
+      "de": "Offen"
+    },
+    "links": {
+      "contributors": "",
+      "docs": "",
+      "texts": ""
+    }
+  },
+  "initiants": [
+    {
+      "fullname": "Therese Dietiker",
+      "party": "EVP",
+      "role": "Auteur"
+    },
+    {
+      "fullname": "Désirée Stutz",
+      "party": "SVP",
+      "role": "Auteur"
+    },
+    {
+      "fullname": "Ruth Müri",
+      "party": "Grüne",
+      "role": "Auteur"
+    },
+    {
+      "fullname": "Manuela Ernst",
+      "party": "GLP",
+      "role": "Auteur"
+    },
+    {
+      "fullname": "Karin Koch Wick",
+      "party": "Die Mitte",
+      "role": "Auteur"
+    },
+    {
+      "fullname": "Edith Saner",
+      "party": "Die Mitte",
+      "role": "Auteur"
+    }
+  ],
+  "arguments": {
+    "contra": "Grossratssitzung vom 10. März 2026 Agenda Untertitel 25.282 Agenda BeschreibungMotion Mia Jenni, SP, Obersiggenthal (Sprecherin), Edith Saner, Mitte, Birmenstorf, Karin Koch Wick, Mitte, Bremgarten, Manuela Ernst, GLP, Wettingen, Ruth Müri, Grüne, Baden, Désirée Stutz, SVP, Möhlin, Therese Dietiker, EVP, Aarau, vom 23. September 2025 betreffend Departementswechsel des Frauenhaus Aargau-Solothurn vom Departement Bildung, Kultur und Sport zum Departement Gesundheit und Soziales AbstimmungstitelAbstimmung AbstimmungsmodusOffen Abstimmungsdatum10.03.2026 16:42 Voting ID 945 AbstimmungsfrageFür die Überweisung der Motion = Ja-Dagegen = Nein Ergebnis Anwesend 134 Stimmberechtigt 134 Ja + 132 Nein - 0 Enthalten x 0 Abgestimmt: 132 Nicht abgestimmt 2 Individuelle Ergebnisse ID Name Partei Wohnort Ergebnis 46 Abt Lukas SVP Brittnau Ja + 26 Aebi Daniel Erich SVP Birmenstorf Ja + 107 Barp Miro SVP Brugg Ja + 97 Basler Colette SP Zeihen Ja + 42 Baumann Thomas Grüne Suhr Ja + 54 Baumgartner Simon SVP Menziken Ja + 126 Baumgartner MonikaDie Mitte Tegerfelden Ja + 93 Baur Jürg Die Mitte Brugg Ja + 59 Berner Yannick FDP Aarau Ja + 38 Betsche Matthias GLP Möriken-WildeggJa + 37 Bieber Béa GLP Rheinfelden Ja + 91 Binder Simon Die Mitte Baden Ja + 133 Binder-Meury Carole SP Magden Ja + 61 Bircher Adrian GLP Aarau Ja + 78 Bodmer René SVP UnterlunkhofenJa + 115 Borer-Mathys BarbaraSVP Holziken Ja + 7 Bossert Martin EDU Rothrist Ja + 94 Brem-Ingold Rita Die Mitte Oberwil-Lieli Ja + 68 Brügger Martin SP Brugg Ja + 66 Bucher Ralf Die Mitte Mühlau Ja + 36 Budmiger Hans-PeterGLP Muri Ja + 4 Burger Nicole SVP Aarau Ja + 138 Burger Alain SP Wettingen Ja + 139 Burkard Flurin SP Waltenschwil Ja + 110 Bütler Alain SVP Kallern Ja + 100 Capanni Luzia SP Windisch Ja + 103 Demarmels Carol... REGIERUNGSRAT 10. Dezember 2025 25.282 Motion Mia Jenni, SP, Obersiggenthal (Sprecherin), Edith Saner, Mitte, Birmenstorf, Karin Koch Wick, Mitte, Bremgarten, Manuela Ernst, GLP, Wettingen, Ruth Müri, Grüne, Baden, Dé- sirée Stutz, SVP, Möhlin, Therese Dietiker, EVP, Aarau, vom 23. September 2025 betreffend Departementswechsel des Frauenhaus Aargau-Solothurn vom Departement Bildung, Kultur und Sport zum Departement Gesundheit und Soziales; Ablehnung beziehungsweise Entge- gennahme als Postulat I. Text und Begründung der Motion wurden den Mitgliedern des Grossen Rats unmittelbar nach...",
+    "pro": "GROSSER RAT GR.25.282 VORSTOSS Motion Mia Jenni, SP, Obersiggenthal (Sprecherin), Edith Saner, Mitte, Birmenstorf, Karin Koch Wick, Mitte, Bremgarten, Manuela Ernst, GLP, Wettingen, Ruth Müri, Grüne, Baden, Désirée Stutz, SVP, Möhlin, Therese Dietiker, EVP, Aarau, vom 23. September 2025 betreffend Departementswechsel des Frauenhaus Aargau-Solothurn vom Departement Bildung, Kultur und Sport zum Departement Gesundheit und Soziales Text: Der Regierungsrat wird beauftragt, die Zuständigkeit für das Frauenhaus Aargau-Solothurn innerhalb der Verwaltung vom Departement Bildung, Kultur und Sport ins Departement Gesundheit und Sozia- les zu verschieben. Begründung: Seit seiner Gründung 1983 beherbergt das Frauenhaus Aargau-Solothurn Opfer häuslicher Gewalt, Frauen und Kinder und bietet ihnen Schutz und Hilfe. Seit 1999 unterhält der Kanton Aargau einen Leistungsvertrag mit der Stiftung Frauenhaus AG-SO, welches laut Leistungsvereinbarung 15 Schutzplätze zur Verfügung stellt. Seit Beginn des Leistungsvertrags ist das Schutzhaus beim De- partement Bildung, Kultur und Sport (BKS) angegliedert und bei der Abteilung Sonderschulung, Heime und Werkstätten (SHW) untergebracht. Dies ist historisch so gewachsen, auch weil das Frau- enhaus Aargau-Solothurn dem Betreuungsgesetz untersteht. Im Vergleich zu anderen Kantonen und im Abgleich mit der betreffenden Gesetzgebung fällt aller- dings auf, dass sich das Frauenhaus Aargau-Solothurn fachfremd bei dieser Abteilung und im Be- treuungsgesetz befindet. Während bei der Abteilung SHW Institutionen untergebracht sind, die sich zumeist mit der langfristigen Unterbringung und Betreuung von spezifischen Menschengruppen be- schäftigen, bietet das Frauenhaus Aargau-Solothurn nur kurzfristig Schutzplätze und Hilfe an und sorgt dafü..."
+  },
+  "docs": [
+    {
+      "name": "Abstimmungsprotokoll mit Namenslisten",
+      "url": "https://www.ag.ch/grossrat/grweb/de/147/Startseite?FrmEntity=grweb.modules.dok.GrDok\u0026FrmRequest=Download\u0026DokId=6847221\u0026Extension=.pdf",
+      "date": "2026-03-10T00:00:00",
+      "format": "application/pdf",
+      "text": "Grossratssitzung vom 10. März 2026 Agenda Untertitel 25.282 Agenda BeschreibungMotion Mia Jenni, SP, Obersiggenthal (Sprecherin), Edith Saner, Mitte, Birmenstorf, Karin Koch Wick, Mitte, Bremgarten, Manuela Ernst, GLP, Wettingen, Ruth Müri, Grüne, Baden, Désirée Stutz, SVP, Möhlin, Therese Dietiker, EVP, Aarau, vom 23. September 2025 betreffend Departementswechsel des Frauenhaus Aargau-Solothurn vom Departement Bildung, Kultur und Sport zum Departement Gesundheit und Soziales AbstimmungstitelAbstimmung AbstimmungsmodusOffen Abstimmungsdatum10.03.2026 16:42 Voting ID 945 AbstimmungsfrageFür die Überweisung der Motion = Ja-Dagegen = Nein Ergebnis Anwesend 134 Stimmberechtigt 134 Ja + 132 Nein - 0 Enthalten x 0 Abgestimmt: 132 Nicht abgestimmt 2 Individuelle Ergebnisse ID Name Partei Wohnort Ergebnis 46 Abt Lukas SVP Brittnau Ja + 26 Aebi Daniel Erich SVP Birmenstorf Ja + 107 Barp Miro SVP Brugg Ja + 97 Basler Colette SP Zeihen Ja + 42 Baumann Thomas Grüne Suhr Ja + 54 Baumgartner Simon SVP Menziken Ja + 126 Baumgartner MonikaDie Mitte Tegerfelden Ja + 93 Baur Jürg Die Mitte Brugg Ja + 59 Berner Yannick FDP Aarau Ja + 38 Betsche Matthias GLP Möriken-WildeggJa + 37 Bieber Béa GLP Rheinfelden Ja + 91 Binder Simon Die Mitte Baden Ja + 133 Binder-Meury Carole SP Magden Ja + 61 Bircher Adrian GLP Aarau Ja + 78 Bodmer René SVP UnterlunkhofenJa + 115 Borer-Mathys BarbaraSVP Holziken Ja + 7 Bossert Martin EDU Rothrist Ja + 94 Brem-Ingold Rita Die Mitte Oberwil-Lieli Ja + 68 Brügger Martin SP Brugg Ja + 66 Bucher Ralf Die Mitte Mühlau Ja + 36 Budmiger Hans-PeterGLP Muri Ja + 4 Burger Nicole SVP Aarau Ja + 138 Burger Alain SP Wettingen Ja + 139 Burkard Flurin SP Waltenschwil Ja + 110 Bütler Alain SVP Kallern Ja + 100 Capanni Luzia SP Windisch Ja + 103 Demarmels Carol SP ObersiggenthalJa + 12 Dietiker Therese EVP Aarau Ja + 98 Dietrich Stefan SP Bremgarten Ja + 32 Egloff Martin FDP Wettingen Nicht anwesend 70 Engeli Lucia SP UnterentfeldenJa + 10 Ernst Thomas FDP Magden Ja + 63 Ernst Manuela GLP Wettingen Ja + 69 Fedeli Marius SP Buchs Ja + 117 Felder Jacqueline SVP Boniswil Ja + 116 Fiechter René SVP HunzenschwilJa + 14 Fischer Lutz EVP Wettingen Nicht anwesend 44 Fischer Bargetzi AndreasGrüne Möhlin Ja + 122 Freiermuth Sabina FDP Zofingen Ja + 40 Fricker Jonas Grüne Baden Ja + 114 Furer Pascal SVP Staufen Nicht anwesend 1 Gabriel Markus SVP Uerkheim Ja + 23 Gassner-Ruf Rahel SVP Zofingen Ja + 21 Gerhard Kurt SVP Brittnau Ja + 24 Gerny Marcel SVP Neuenhof Ja + 50 Giezendanner StefanSVP Baden Ja + 87 Glarner Jeanine FDP Möriken-WildeggJa + 27 Gosteli Patrick SVP Böttstein Ja + 112 Gratwohl Mario SVP Niederwil Ja + 39 Gresch Dominik GLP Zofingen Ja + 18 Grieder Julia Rahel Grüne Brugg Ja + 80 Hagenbuch ChristophSVP OberlunkhofenJa + 8 Haldimann Roland EDU OberentfeldenJa + 6 Haller Rolf EDU Zetzwil Ja + 120 Hauser Claudia FDP Döttingen Ja + 82 Häusermann RenateSVP Seengen Ja + 109 Heggli-Boder Nicole SVP Buttwil Ja + 60 Hilfiker Hanspeter FDP Aarau Ja + 88 Hilfiker Silvan FDP Jonen Nicht anwesend 5 Hochreuter Clemens SVP Erlinsbach Ja + 20 Hölzle Daniel Grüne Zofingen Ja + 58 Hottiger Tobias FDP Zofingen Ja + 35 Huber Lukas GLP Berikon Ja + 71 Hubmann HanspeterSP Schneisingen Ja + 101 Hunziker Lelia SP Aarau Ja + 121 Huwyler Stefan FDP Muri Ja + 81 Jäggi Rolf SVP Seengen Nicht anwesend 95 Jegge Severine Die Mitte Oberrohrdorf Ja + 137 Jenni Mia SP ObersiggenthalJa + 33 Jenny Johannes FDP Baden Ja + 9 Käser Beat FDP Stein Ja + 53 Kaspar Manuel SVP Oberkulm Ja + 43 Kaufmann Maurus Grüne Seon Ja + 123 Kaufmann Alfons PaulDie Mitte Wallbach Ja + 64 Kern Knecht LeandraGLP Windisch Ja + 124 Koch Wick Karin Die Mitte Bremgarten Ja + 79 Köpfli Stefanie SVP Arni Ja + 16 Kosch Mirjam Grüne Aarau Ja + 51 Kuster Petra SVP Neuenhof Ja + 62 Lang Markus GLP Brugg Ja + 67 Lanz Lucia SP Beinwil am SeeJa + 89 Laube Philipp Die Mitte Lengnau Ja + 135 Lauper Richner GabiSP Niederlenz Ja + 17 Lüscher Severin Grüne Schöftland Ja..."
+    },
+    {
+      "name": "Stellungnahme RR; Ablehnung beziehungsweise Entgegennahme als Postulat",
+      "url": "https://www.ag.ch/grossrat/grweb/de/147/Startseite?FrmEntity=grweb.modules.dok.GrDok\u0026FrmRequest=Download\u0026DokId=6774135\u0026Extension=.pdf",
+      "date": "2025-12-10T00:00:00",
+      "format": "application/pdf",
+      "text": "REGIERUNGSRAT 10. Dezember 2025 25.282 Motion Mia Jenni, SP, Obersiggenthal (Sprecherin), Edith Saner, Mitte, Birmenstorf, Karin Koch Wick, Mitte, Bremgarten, Manuela Ernst, GLP, Wettingen, Ruth Müri, Grüne, Baden, Dé- sirée Stutz, SVP, Möhlin, Therese Dietiker, EVP, Aarau, vom 23. September 2025 betreffend Departementswechsel des Frauenhaus Aargau-Solothurn vom Departement Bildung, Kultur und Sport zum Departement Gesundheit und Soziales; Ablehnung beziehungsweise Entge- gennahme als Postulat I. Text und Begründung der Motion wurden den Mitgliedern des Grossen Rats unmittelbar nach der Einreichung zugestellt. II. Der Regierungsrat lehnt die Motion mit folgender Begründung ab beziehungsweise ist bereit, die Mo- tion als Postulat entgegenzunehmen: Im Kanton Aargau sind in Bezug auf Schutzangebote für von gewaltbetroffenen Frauen zwei Depar- temente zuständig: das Departement Bildung, Kultur und Sport, welches das Frauenhaus Aargau- Solothurn als Betreuungseinrichtung mit Leistungsvertrag führt und beaufsichtigt sowie das Departe- ment Gesundheit und Soziales, das die Aufenthalte im Frauenhaus im Rahmen der Opferhilfe finan- ziert. Vorhaben in Bezug auf das Frauenhaus müssen zwischen den Kantonen Aargau und Solo- thurn, der ebenfalls einen Leistungsvertrag mit dem Frauenhaus führt, abgestimmt werden. Das Frauenhaus Aargau-Solothurn steht vor dringend erforderlichen Entwicklungen. Im interkantonalen Vergleich ist die Zuordnung von Opferhilfe und Frauenhäusern unterschiedlich. Eine Zuständigkeit im Sozialen entspricht der Situation in einigen Deutschschweizer Kantonen (zum Beispiel Bern und Solothurn). In anderen Kantonen – wie beispielsweise den Kantonen St. Gallen und Zürich – sind die Zuständigkeiten wie im Kanton Aargau auf verschiedene Departemente oder Stellen verteilt. Auf interkantonaler Ebene befasst sich insbesondere die Konferenz der kantonalen Sozialdirektorinnen und Sozialdirektoren (SODK) mit Schutzangeboten für gewaltbetroffene Frauen. Zu beachten sind jedoch die aktuellen Zuständigkeiten und rechtlichen Grundlagen, insbesondere betreffend Finanzierung. Aufenthalte im Frauenhaus werden bis zum 44. Tag über die Opferhilfe fi- nanziert. Das Departement Bildung, Kultur und Sport ist für die Entwicklung des Frauenhauses, den Leistungsvertrag und die Finanzierung von Aufenthalten, die länger als 44 Tage dauern, zusammen mit den Gemeinden verantwortlich. 2 von 2 Konsequenzen der Umsetzung, insbesondere Auswirkungen auf die Aufgaben- und Finanzplanung Ob und inwiefern eine Zusammenführung der Verantwortlichkeit für das Frauenhaus in einem Depar- tement sinnvoll ist, soll zunächst vertieft geprüft werden, wofür eine fachliche, finanzielle und rechtli- che Aspekte umfassende Analyse erfolgen soll. Dabei sollen auch geplante Entwicklungen, wie ins- besondere ein möglicher Wechsel zur Subjektfinanzierung von Angeboten für erwachsene Menschen mit Behinderungen (ESP 315E009), berücksichtigt werden. Vorgesehene Art der Umsetzung und geltende Frist Die vollständige Umsetzung des vorliegenden Vorstosses würde die Vorlage einer Gesetzesände- rung (vgl. § 45 Abs. 1 Gesetz über die Organisation des Grossen Rates und über den Verkehr zwi- schen dem Grossen Rat, dem Regierungsrat und der Justizleitung [Geschäftsverkehrsgesetz, GVG; SAR 152.200]) bedingen, mit folgender Begründung: Die Regelungen zur Finanzierung von Aufenthalten über 44 Tage im Frauenhaus sind heute im Ge- setz über die Einrichtungen für Menschen mit besonderen Betreuungsbedürfnissen (Betreuungsge- setz, BeG; SAR 428.500) geregelt. Die Finanzierung der ersten 44 Tage wie auch die Regelung zur Dauer der Finanzierung über die Opferhilfe basieren auf den kantonalen Ausführungsbestimmungen zum Bundesgesetz über die Hilfe an Opfer von Straftaten (Opferhilfegesetz, OHG; SR 312.5). In wel- chen Rechtsgrundlagen die Finanzierung bei einem Zuständigkeitswechsel verankert werden sollte und welche Folgen eine Gesetzesänderung für..."
+    },
+    {
+      "name": "Motionstext",
+      "url": "https://www.ag.ch/grossrat/grweb/de/147/Startseite?FrmEntity=grweb.modules.dok.GrDok\u0026FrmRequest=Download\u0026DokId=6677388\u0026Extension=.pdf",
+      "date": "2025-09-23T00:00:00",
+      "text": "GROSSER RAT GR.25.282 VORSTOSS Motion Mia Jenni, SP, Obersiggenthal (Sprecherin), Edith Saner, Mitte, Birmenstorf, Karin Koch Wick, Mitte, Bremgarten, Manuela Ernst, GLP, Wettingen, Ruth Müri, Grüne, Baden, Désirée Stutz, SVP, Möhlin, Therese Dietiker, EVP, Aarau, vom 23. September 2025 betreffend Departementswechsel des Frauenhaus Aargau-Solothurn vom Departement Bildung, Kultur und Sport zum Departement Gesundheit und Soziales Text: Der Regierungsrat wird beauftragt, die Zuständigkeit für das Frauenhaus Aargau-Solothurn innerhalb der Verwaltung vom Departement Bildung, Kultur und Sport ins Departement Gesundheit und Sozia- les zu verschieben. Begründung: Seit seiner Gründung 1983 beherbergt das Frauenhaus Aargau-Solothurn Opfer häuslicher Gewalt, Frauen und Kinder und bietet ihnen Schutz und Hilfe. Seit 1999 unterhält der Kanton Aargau einen Leistungsvertrag mit der Stiftung Frauenhaus AG-SO, welches laut Leistungsvereinbarung 15 Schutzplätze zur Verfügung stellt. Seit Beginn des Leistungsvertrags ist das Schutzhaus beim De- partement Bildung, Kultur und Sport (BKS) angegliedert und bei der Abteilung Sonderschulung, Heime und Werkstätten (SHW) untergebracht. Dies ist historisch so gewachsen, auch weil das Frau- enhaus Aargau-Solothurn dem Betreuungsgesetz untersteht. Im Vergleich zu anderen Kantonen und im Abgleich mit der betreffenden Gesetzgebung fällt aller- dings auf, dass sich das Frauenhaus Aargau-Solothurn fachfremd bei dieser Abteilung und im Be- treuungsgesetz befindet. Während bei der Abteilung SHW Institutionen untergebracht sind, die sich zumeist mit der langfristigen Unterbringung und Betreuung von spezifischen Menschengruppen be- schäftigen, bietet das Frauenhaus Aargau-Solothurn nur kurzfristig Schutzplätze und Hilfe an und sorgt dafür, dass die Schutzsuchenden wieder in einen Alltag zurückfinden können. Ausserdem ist im Erwachsenenbereich das Zugangskriterium zu Leistungen, die nach Betreuungsgesetz finanziert werden, zumeist das Vorliegen einer Invalidität. Dies ist nicht der Fall bei einem Aufenthalt im Frau- enhaus. Des Weiteren wird das Frauenhaus Aargau-Solothurn momentan nach SODK Ost-Richtli- nien geprüft, welche auf Institutionen für erwachsene Menschen mit Behinderung ausgerichtet sind, obwohl es klare Qualitätsrichtlinien gibt für Frauenhäuser. Die Konferenz der Sozialdirektorinnen und Sozialdirektoren (SODK) beschäftigt sich vertieft mit der Finanzierung und Stabilisierung der Frauenhäuser und kümmert sich um Fragen der Koordination und der Anschlusslösungen. Auch der Leistungskatalog für Frauenhäuser wurde von der SODK er- stellt und viele Kantone richten ihre Leistungsvereinbarungen danach aus. Im Kanton Aargau sind diese Fragen beim Departement für Gesundheit und Soziales (DGS) untergebracht. Zusätzlich befin- det sich die Opferhilfe beim DGS, welche durch ihren Auftrag über einen gesamtheitlichen Überblick in die Situation der gewaltbetroffenen Frauen verfügt. Dies betrifft insbesondere auch Situationen, wo 2 von 2 kein Aufenthalt im Frauenhaus erforderlich ist. Mit der Überführung des Frauenhauses zum DGS ent- stünde ein einheitliches Bild über die Angebote und Lösungswege für gewaltbetroffene Frauen, was eine gesamtheitliche Angebotsplanung erleichtern würde. Der Wechsel bietet den Vorteil der kurzen Wege zwischen der Opferhilfe und dem Frauenhaus Aar- gau-Solothurn, da beide beim DGS angesiedelt wären und damit ein umfassenderer Überblick über Schutzsuchende, Entwicklungen und damit auch notwendige Ressourcen möglich wären. Die Kon- zentration von Know-How in einem Departement sorgt wohl auch für einen schlankeren Verwaltungs- apparat. Die Finanzierungsmechanismen sollen entlang dieses Wechsels gleichbleiben, da heute ein viel- schichtiges Zusammenspiel zwischen Kanton und Gemeinden in Kraft ist, welches einen Aufenthalt für Schutzsuchende garantiert."
+    }
+  ],
+  "texts": []
+}

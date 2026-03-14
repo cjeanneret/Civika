@@ -1,0 +1,85 @@
+---
+description: Exigences privacy et protection des données utilisateur
+alwaysApply: true
+---
+
+# Règle Privacy & User Data
+
+## Principe général
+- Appliquer un principe privacy-first, sans profilage.
+- Civika ne doit pas stocker ni exploiter de données utilisateur identifiables.
+- Appliquer le modèle "calculer et jeter": traiter les entrées de manière stateless, sans persistance d'informations personnelles.
+
+## Identité et comptes
+- Interdire tout compte utilisateur et toute authentification pour les fonctionnalités publiques.
+- Ne jamais implémenter:
+  - systèmes de login,
+  - sessions persistantes,
+  - profils utilisateur,
+  - préférences stockées côté serveur.
+- Si une fonctionnalité nécessite un état côté client, imposer en priorité:
+  - un stockage éphémère en mémoire,
+  - ou un stockage local chiffré côté navigateur (`localStorage` ou équivalent), sans remontée vers le backend.
+- Même dans ce cas, considérer ces informations comme non essentielles.
+
+## Collecte et logs
+- Back-end:
+  - Ne jamais logger durablement les adresses IP ni tout autre identifiant utilisateur (interdiction de corrélation IP + timestamp + requêtes).
+  - Limiter strictement les logs applicatifs à:
+    - codes de statut HTTP,
+    - identifiants techniques d'erreur,
+    - métadonnées non personnelles.
+  - Ne jamais logger le contenu des requêtes utilisateur (inputs), sauf si ces trois conditions sont simultanément remplies:
+    - c'est strictement nécessaire pour le debug,
+    - cette journalisation peut être désactivée par configuration,
+    - aucun contenu personnel n'est enregistré.
+- Front-end:
+  - Interdire tout tracking tiers (Google Analytics, etc.).
+  - Si des métriques sont nécessaires, n'autoriser que:
+    - une solution self-hosted anonymisée,
+    - ou aucune collecte par défaut.
+- Interdire tout cookie de tracking ou de fingerprinting.
+- Si des cookies sont introduits plus tard (ex: anti-CSRF), les documenter explicitement et les limiter strictement à la sécurité.
+
+## Données utilisateur dans le coeur métier
+- Traiter les entrées utilisateur uniquement comme:
+  - des paramètres éphémères pour le calcul de scénarios,
+  - des données non persistées durablement en base.
+- Les bases de données de Civika ne doivent contenir:
+  - que des données politiques et administratives issues de sources officielles (`opendata.swiss`, FSO, `admin.ch`, Swissvotes, OpenParlData, etc.),
+  - aucune donnée de comportement individuel (pas d'historique de votes personnels, pas de préférences politiques individuelles).
+
+## Appels LLM et privacy
+- Utiliser les LLM uniquement pour analyser et expliquer l'impact des votations à partir de données politiques officielles.
+- Ne jamais envoyer au LLM:
+  - de données permettant d'identifier un utilisateur (nom, email, IP, identifiants, texte libre manifestement personnel),
+  - d'informations de profil politique individuel ou de traces de comportement d'un utilisateur donné.
+- Construire les prompts LLM uniquement à partir de:
+  - données politiques et administratives issues des sources officielles (datasets, textes de loi, résumés publics),
+  - inputs abstraits du type "l'utilisateur envisage de voter OUI/NON", sans identifiant personnel.
+- Ne jamais stocker durablement les prompts et outputs LLM liés à un utilisateur.
+  - Si un logging technique est indispensable:
+    - anonymiser et tronquer les données,
+    - exclure tout contenu pouvant être relié à une personne.
+- Les tokens et clés API LLM:
+  - doivent être configurés via variables d'environnement ou fichier de configuration non versionné,
+  - ne doivent jamais être commités dans le repo.
+
+## État et persistance
+- Le backend doit rester stateless vis-a-vis des utilisateurs finaux.
+- Toute persistance (base de données, fichiers) doit être explicitement limitée à:
+  - des données politiques (votations, résultats, objets parlementaires, etc.),
+  - des métadonnées techniques nécessaires au fonctionnement (ex: migrations, cache de datasets).
+- Ne jamais introduire de tables ou collections de type:
+  - `users`, `profiles`, `sessions`, `histories`, `preferences`, etc.
+
+## Communication et transparence
+- Prévoir une page "Privacy/Confidentialité" qui doit expliquer clairement:
+  - qu'aucun compte n'est créé,
+  - qu'aucune donnée personnelle n'est stockée,
+  - qu'aucun profil politique n'est construit,
+  - que les calculs sont réalisés à la volée et non liés à une identité.
+- Toute nouvelle feature proposée par l'IA ou par un dev qui impliquerait:
+  - de la persistance côté serveur de données liées aux utilisateurs,
+  - ou une forme de profilage,
+  - doit être considérée hors scope et marquée comme NON-GOAL, sauf mise à jour explicite de ces règles.

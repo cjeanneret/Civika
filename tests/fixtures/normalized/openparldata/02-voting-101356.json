@@ -1,0 +1,87 @@
+{
+  "source_system": "openparldata",
+  "source_org": "OpenParlData.ch",
+  "fetched_at_utc": "2026-03-13T21:22:17Z",
+  "selection_strategy": "fallback_past",
+  "available_languages": [
+    "de"
+  ],
+  "voting": {
+    "id": 101356,
+    "url_api": "https://api.openparldata.ch/v1/votings/101356",
+    "body_key": "AG",
+    "external_id": "6847048_1",
+    "date": "2026-03-10T16:02:16",
+    "title": {
+      "de": "Abstimmung (Abschreibung)"
+    },
+    "affair_id": 256545,
+    "affair_title": {
+      "de": "Programm zur Förderung der Handlungsfelder Sprachförderung, Schulerfolg und Integration an multikulturellen Schulen"
+    },
+    "meaning_of_yes": {
+      "de": "Für die Abschreibung = Ja-Gegen die Abschreibung = Nein"
+    },
+    "meaning_of_no": {},
+    "links": {
+      "affairs": "https://api.openparldata.ch/v1/votings/101356/affairs"
+    }
+  },
+  "affair": {
+    "id": 256545,
+    "url_api": "",
+    "external_id": "6676646",
+    "title": {
+      "de": "Programm zur Förderung der Handlungsfelder Sprachförderung, Schulerfolg und Integration an multikulturellen Schulen"
+    },
+    "title_long": {
+      "de": "Postulat der SP-Fraktion (Sprecher Alain Burger, Wettingen) vom 23. September 2025 betreffend Programm zur Förderung der Handlungsfelder Sprachförderung, Schulerfolg und Integration an multikulturellen Schulen"
+    },
+    "type_name": {
+      "de": "Postulat"
+    },
+    "state_name": {
+      "de": "Offen"
+    },
+    "links": {
+      "contributors": "",
+      "docs": "",
+      "texts": ""
+    }
+  },
+  "initiants": [
+    {
+      "fullname": "SP-Fraktion",
+      "party": "SP",
+      "role": "Auteur"
+    }
+  ],
+  "arguments": {
+    "contra": "indisponible",
+    "pro": "Grossratssitzung vom 10. März 2026 Agenda Untertitel 25.278 Agenda BeschreibungPostulat der SP-Fraktion (Sprecher Alain Burger, Wettingen) vom 23. September 2025 betreffend Programm zur Förderung der Handlungsfelder Sprachförderung, Schulerfolg und Integration an multikulturellen Schulen AbstimmungstitelAbstimmung (Abschreibung) AbstimmungsmodusOffen Abstimmungsdatum10.03.2026 16:02 Voting ID 942 AbstimmungsfrageFür die Abschreibung = Ja-Gegen die Abschreibung = Nein Ergebnis Anwesend 135 Stimmberechtigt 135 Ja + 78 Nein - 54 Enthalten x 0 Abgestimmt: 132 Nicht abgestimmt 3 Individuelle Ergebnisse ID Name Partei Wohnort Ergebnis 46 Abt Lukas SVP Brittnau Ja + 26 Aebi Daniel Erich SVP Birmenstorf Ja + 107 Barp Miro SVP Brugg Ja + 97 Basler Colette SP Zeihen Nein - 42 Baumann Thomas Grüne Suhr Nein - 54 Baumgartner Simon SVP Menziken Ja + 126 Baumgartner MonikaDie Mitte Tegerfelden Ja + 93 Baur Jürg Die Mitte Brugg Nein - 59 Berner Yannick FDP Aarau Ja + 38 Betsche Matthias GLP Möriken-WildeggNein - 37 Bieber Béa GLP Rheinfelden Nein - 91 Binder Simon Die Mitte Baden Ja + 133 Binder-Meury CaroleSP Magden Nein - 61 Bircher Adrian GLP Aarau Nein - 78 Bodmer René SVP UnterlunkhofenJa + 115 Borer-Mathys BarbaraSVP Holziken Ja + 7 Bossert Martin EDU Rothrist Ja + 94 Brem-Ingold Rita Die Mitte Oberwil-Lieli Ja + 68 Brügger Martin SP Brugg Nein - 66 Bucher Ralf Die Mitte Mühlau Nein - 36 Budmiger Hans-PeterGLP Muri Nein - 4 Burger Nicole SVP Aarau Ja + 138 Burger Alain SP Wettingen Nein - 139 Burkard Flurin SP Waltenschwil Nein - 110 Bütler Alain SVP Kallern Ja + 100 Capanni Luzia SP Windisch Nein - 103 Demarmels Carol SP ObersiggenthalNein - 12 Dietiker Therese EVP Aarau Ja + 98 Dietrich Stefan SP Bremgarten Nein - 32 Egloff Martin FDP Wettingen Nicht anwesend 70 En... REGIERUNGSRAT 17. Dezember 2025 25.278 Postulat der SP-Fraktion (Sprecher Alain Burger, Wettingen) vom 23. September 2025 betref- fend Programm zur Förderung der Handlungsfelder Sprachförderung, Schulerfolg und In- tegration an multikulturellen Schulen; Entgegennahme unter gleichzeitiger Abschreibung I. Text und Begründung des Postulats wurden den Mitgliedern des Grossen Rats unmittelbar nach der Einreichung zugestellt. II. Der Regierungsrat nimmt das Postulat unter gleichzeitiger Abschreibung entgegen: 1. Vorbemerkungen Der Regierungsrat hat sich in den vergangenen Jahren bereits in ve..."
+  },
+  "docs": [
+    {
+      "name": "Abstimmungsprotokoll mit Namenslisten",
+      "url": "https://www.ag.ch/grossrat/grweb/de/147/Startseite?FrmEntity=grweb.modules.dok.GrDok\u0026FrmRequest=Download\u0026DokId=6847048\u0026Extension=.pdf",
+      "date": "2026-03-10T00:00:00",
+      "format": "application/pdf",
+      "text": "Grossratssitzung vom 10. März 2026 Agenda Untertitel 25.278 Agenda BeschreibungPostulat der SP-Fraktion (Sprecher Alain Burger, Wettingen) vom 23. September 2025 betreffend Programm zur Förderung der Handlungsfelder Sprachförderung, Schulerfolg und Integration an multikulturellen Schulen AbstimmungstitelAbstimmung (Abschreibung) AbstimmungsmodusOffen Abstimmungsdatum10.03.2026 16:02 Voting ID 942 AbstimmungsfrageFür die Abschreibung = Ja-Gegen die Abschreibung = Nein Ergebnis Anwesend 135 Stimmberechtigt 135 Ja + 78 Nein - 54 Enthalten x 0 Abgestimmt: 132 Nicht abgestimmt 3 Individuelle Ergebnisse ID Name Partei Wohnort Ergebnis 46 Abt Lukas SVP Brittnau Ja + 26 Aebi Daniel Erich SVP Birmenstorf Ja + 107 Barp Miro SVP Brugg Ja + 97 Basler Colette SP Zeihen Nein - 42 Baumann Thomas Grüne Suhr Nein - 54 Baumgartner Simon SVP Menziken Ja + 126 Baumgartner MonikaDie Mitte Tegerfelden Ja + 93 Baur Jürg Die Mitte Brugg Nein - 59 Berner Yannick FDP Aarau Ja + 38 Betsche Matthias GLP Möriken-WildeggNein - 37 Bieber Béa GLP Rheinfelden Nein - 91 Binder Simon Die Mitte Baden Ja + 133 Binder-Meury CaroleSP Magden Nein - 61 Bircher Adrian GLP Aarau Nein - 78 Bodmer René SVP UnterlunkhofenJa + 115 Borer-Mathys BarbaraSVP Holziken Ja + 7 Bossert Martin EDU Rothrist Ja + 94 Brem-Ingold Rita Die Mitte Oberwil-Lieli Ja + 68 Brügger Martin SP Brugg Nein - 66 Bucher Ralf Die Mitte Mühlau Nein - 36 Budmiger Hans-PeterGLP Muri Nein - 4 Burger Nicole SVP Aarau Ja + 138 Burger Alain SP Wettingen Nein - 139 Burkard Flurin SP Waltenschwil Nein - 110 Bütler Alain SVP Kallern Ja + 100 Capanni Luzia SP Windisch Nein - 103 Demarmels Carol SP ObersiggenthalNein - 12 Dietiker Therese EVP Aarau Ja + 98 Dietrich Stefan SP Bremgarten Nein - 32 Egloff Martin FDP Wettingen Nicht anwesend 70 Engeli Lucia SP UnterentfeldenNein - 10 Ernst Thomas FDP Magden Ja + 63 Ernst Manuela GLP Wettingen Nein - 69 Fedeli Marius SP Buchs Nein - 117 Felder Jacqueline SVP Boniswil Ja + 116 Fiechter René SVP HunzenschwilJa + 14 Fischer Lutz EVP Wettingen Ja + 44 Fischer Bargetzi AndreasGrüne Möhlin Nein - 122 Freiermuth Sabina FDP Zofingen Ja + 40 Fricker Jonas Grüne Baden Nein - 114 Furer Pascal SVP Staufen Ja + 1 Gabriel Markus SVP Uerkheim Ja + 23 Gassner-Ruf Rahel SVP Zofingen Ja + 21 Gerhard Kurt SVP Brittnau Ja + 24 Gerny Marcel SVP Neuenhof Ja + 50 Giezendanner StefanSVP Baden Ja + 87 Glarner Jeanine FDP Möriken-WildeggJa + 27 Gosteli Patrick SVP Böttstein Ja + 112 Gratwohl Mario SVP Niederwil Ja + 39 Gresch Dominik GLP Zofingen Nein - 18 Grieder Julia Rahel Grüne Brugg Nein - 80 Hagenbuch ChristophSVP OberlunkhofenJa + 8 Haldimann Roland EDU OberentfeldenJa + 6 Haller Rolf EDU Zetzwil Ja + 120 Hauser Claudia FDP Döttingen Ja + 82 Häusermann RenateSVP Seengen Ja + 109 Heggli-Boder Nicole SVP Buttwil Ja + 60 Hilfiker Hanspeter FDP Aarau Ja + 88 Hilfiker Silvan FDP Jonen Nicht anwesend 5 Hochreuter ClemensSVP Erlinsbach Ja + 20 Hölzle Daniel Grüne Zofingen Nein - 58 Hottiger Tobias FDP Zofingen Ja + 35 Huber Lukas GLP Berikon Nein - 71 Hubmann HanspeterSP Schneisingen Nein - 101 Hunziker Lelia SP Aarau Nein - 121 Huwyler Stefan FDP Muri Ja + 81 Jäggi Rolf SVP Seengen Nicht anwesend 95 Jegge Severine Die Mitte Oberrohrdorf Ja + 137 Jenni Mia SP ObersiggenthalNein - 33 Jenny Johannes FDP Baden Ja + 9 Käser Beat FDP Stein Ja + 53 Kaspar Manuel SVP Oberkulm Ja + 43 Kaufmann Maurus Grüne Seon Nein - 123 Kaufmann Alfons PaulDie Mitte Wallbach Nein - 64 Kern Knecht LeandraGLP Windisch Nein - 124 Koch Wick Karin Die Mitte Bremgarten Nein - 79 Köpfli Stefanie SVP Arni Ja + 16 Kosch Mirjam Grüne Aarau Nein - 51 Kuster Petra SVP Neuenhof Ja + 62 Lang Markus GLP Brugg Nein - 67 Lanz Lucia SP Beinwil am SeeNein - 89 Laube Philipp Die Mitte Lengnau Nicht abgestimmt 135 Lauper Richner GabiSP Niederlenz Nein - 17 Lüscher Severin Grüne Schöftland Nicht anwesend 3 Lüthy Markus SVP Erlinsbach Ja + 125 Lütolf Harry Die Mitte Wohlen Nein - 29 Mäder Michael SVP Dö..."
+    },
+    {
+      "name": "Stellungnahme RR; Entgegennahme unter gleichzeitiger Abschreibung",
+      "url": "https://www.ag.ch/grossrat/grweb/de/147/Startseite?FrmEntity=grweb.modules.dok.GrDok\u0026FrmRequest=Download\u0026DokId=6782579\u0026Extension=.pdf",
+      "date": "2025-12-17T00:00:00",
+      "format": "application/pdf",
+      "text": "REGIERUNGSRAT 17. Dezember 2025 25.278 Postulat der SP-Fraktion (Sprecher Alain Burger, Wettingen) vom 23. September 2025 betref- fend Programm zur Förderung der Handlungsfelder Sprachförderung, Schulerfolg und In- tegration an multikulturellen Schulen; Entgegennahme unter gleichzeitiger Abschreibung I. Text und Begründung des Postulats wurden den Mitgliedern des Grossen Rats unmittelbar nach der Einreichung zugestellt. II. Der Regierungsrat nimmt das Postulat unter gleichzeitiger Abschreibung entgegen: 1. Vorbemerkungen Der Regierungsrat hat sich in den vergangenen Jahren bereits in verschiedenen Stellungnahmen und Berichterstattungen zu parlamentarischen Vorstössen betreffend die Sprachförderung an der Volksschule und die damit einhergehende Diskussion rund um Heterogenität und Chancengerechtig- keit in der Aargauer Volksschule geäussert, zuletzt in den folgenden: • (16.190) Motion der FDP-Fraktion (Sprecher Adrian Meier, Reinach) vom 13. September 2016 betreffend Schaffung der erforderlichen gesetzlichen Grundlagen, damit die Kinder bereits bei Volksschuleintritt (Kindergarteneintritt) über ausreichende Deutschkenntnisse verfügen (als Pos- tulat überwiesen) • (18.190) Postulat der CVP-Fraktion (Sprecher Alfons Paul Kaufmann, Wallbach) vom 18. Septem- ber 2018 betreffend obligatorische frühe Sprachförderung für fremdsprachige Kinder • (20.53) Motion Bruno Rudolf, SVP, Reinach, vom 3. März 2020 betreffend \"frühe Sprachförde- rung\" • (23.192) Postulat Dr. Adrian Schoop, FDP, Turgi, vom 13. Juni 2023 betreffend Massnahmen ge- gen die negativen Auswirkungen des hohen Fremdsprachenanteils an gewissen Schulen • (23.76) Interpellation Dr. Adrian Schoop, FDP, Turgi, vom 14. März 2023 betreffend Deutsch- pflicht auf dem Schulareal • (23.81) Motion Tonja Burri, SVP, Hausen (Sprecherin), Stephan Müller, SVP, Möhlin, Maya Meier, SVP, Auenstein, Miro Barp, SVP, Brugg, vom 14. März 2023 betreffend Sprachgebrauch auf den Aargauer Pausenplätzen der Volksschule https://www.ag.ch/grossrat/grweb/de/195/Detail%20Gesch%C3%A4ft?ProzId=970773 https://www.ag.ch/grossrat/grweb/de/195/Detail%20Gesch%C3%A4ft?ProzId=3966213 https://www.ag.ch/grossrat/grweb/de/195/Detail%20Gesch%C3%A4ft?ProzId=4604597 https://www.ag.ch/grossrat/grweb/de/195/Detail%20Gesch%C3%A4ft?ProzId=5976066 https://www.ag.ch/grossrat/grweb/de/195/Detail%20Gesch%C3%A4ft?ProzId=5892741 https://www.ag.ch/grossrat/grweb/de/195/Detail%20Gesch%C3%A4ft?ProzId=5892792 2 von 4 • (25.281) Interpellation Ruth Müri, Grüne, Baden, vom 23. September 2025 betreffend Mundart- pflicht im Kindergarten und Erreichen der Grundkompetenzen in Deutsch 2. Begründung der Entgegennahme unter gleichzeitiger Abschreibung Der Regierungsrat anerkennt, dass die Volksschulen im Kanton Aargau in den vergangenen Jahren zunehmend mit sprachlich und sozial heterogenen Lerngruppen konfrontiert sind. So ist beispiels- weise der Anteil fremdsprachiger Schülerinnen und Schüler im Zeitraum von 2014–2024 deutlich an- gestiegen von rund 30,5 % auf 39,3 %1. Dies führt zu höheren Anforderungen an Unterricht, beson- dere Förderung und Integration. Der Regierungsrat teilt ebenfalls die Einschätzung, dass Schulen mit anspruchsvollen Voraussetzungen gezielt und wirksam in den Bereichen Sprache, Schulerfolg und soziale Integration unterstützt werden sollen. Er erachtet es als notwendig, dass insbesondere Schü- lerinnen und Schüler aus benachteiligten Gruppen gezielt gefördert werden. Für eine erfolgreiche schulische Laufbahn ist eine chancengerechte und qualitativ hochwertige Volksschule wichtig. Jedoch erachtet der Regierungsrat die Einführung eines spezifischen Förder- programms nach dem Vorbild von QUIMS2 an den Aargauer Volksschulen nicht als zielführend, da dessen Inhalte bereits in zahlreiche laufende Vorhaben integriert sind. Bereits bestehende finanzielle Unterstützung durch den Kanton über die Zusatzkompo- nente 1 Die Ressourcenzuteilung für Regelschulen erfolgt übe..."
+    },
+    {
+      "name": "Postulatstext",
+      "url": "https://www.ag.ch/grossrat/grweb/de/147/Startseite?FrmEntity=grweb.modules.dok.GrDok\u0026FrmRequest=Download\u0026DokId=6676811\u0026Extension=.pdf",
+      "date": "2025-09-23T00:00:00",
+      "format": "application/pdf",
+      "text": "GROSSER RAT GR.25.278 VORSTOSS Postulat der SP-Fraktion (Sprecher Alain Burger, Wettingen) vom 23. September 2025 betref- fend Programm zur Förderung der Handlungsfelder Sprachförderung, Schulerfolg und In- tegration an multikulturellen Schulen Text: Der Regierungsrat wird beauftragt zu prüfen und dem Grossen Rat zu berichten, wie im Kanton Aar- gau ein Programm nach dem Vorbild von QUIMS (Qualität in multikulturellen Schulen) eingeführt werden kann, um Schulen, die von überdurchschnittlich vielen Kindern aus eingewanderten, fremd- sprachigen und sozial nicht privilegierten Familien besucht werden, in den Handlungsfeldern Spra- che, Schulerfolg und soziale Integration gezielt und wirksam zu unterstützen. Begründung: Das vom Kanton Zürich entwickelte und seit Jahren erfolgreich umgesetzte Programm QUIMS unter- stützt Schulen, die von überdurchschnittlich vielen Kindern und Jugendlichen aus eingewanderten, fremdsprachigen und/oder sozial benachteiligten Familien besucht werden. Ziel des Programms ist es, die Qualität der schulischen Bildung in drei zentralen Handlungsfeldern zu stärken: Sprachförde- rung, Schulerfolg für alle und soziale Integration Die QUIMS-Schulen erhalten zur Umsetzung dieser Zielsetzungen zusätzliche fachliche und teil- weise auch finanzielle Unterstützung. Die Pädagogische Hochschule Zürich begleitet die Schulen da- bei wissenschaftlich und beratend. Die Massnahmen sind so ausgerichtet, dass sie allen Schülerinnen und Schülern zugutekommen – unabhängig von ihrer sozialen oder sprachlichen Herkunft sowie ihrer Leistungsstärke. Besonders wichtig ist dabei der integrative Ansatz: QUIMS setzt nicht auf Sondermassnahmen für einzelne Gruppen, sondern auf eine systematische Qualitätsentwicklung der Schule als Ganzes. Im Kanton Zürich nehmen derzeit über 150 Schulen am Programm teil. Die Erfahrungen zeigen, dass QUIMS nicht nur einen positiven Beitrag zur Integration und Chancengleichheit leistet, sondern auch die allgemeine Schulqualität verbessert. Auch im Kanton Aargau stehen zahlreiche Schulen vor vergleichbaren Herausforderungen. Es wäre daher im Interesse einer chancengerechten und qualitativ hochwertigen Volksschule, ein ähnliches Programm zu prüfen und gegebenenfalls einzuführen. Der Regierungsrat soll in diesem Zusammen- hang insbesondere klären: - wie viele Schulen im Aargau ein vergleichbares Profil wie die Zürcher QUIMS-Schulen aufwei- sen, - welche fachlichen und strukturellen Voraussetzungen für eine Umsetzung notwendig wären, - wie eine Kooperation mit bestehenden Institutionen (z. B. der PH FHNW) aussehen könnte, 2 - welche finanziellen Mittel dafür eingesetzt werden müssten, - und welche Synergien mit bestehenden kantonalen oder kommunalen Integrationsprogrammen genutzt werden könnten."
+    }
+  ],
+  "texts": []
+}

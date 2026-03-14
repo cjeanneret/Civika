@@ -1,0 +1,91 @@
+name: RAG Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  security-gates:
+    name: Security gates (npm audit + govulncheck)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Frontend dependency audit
+        run: make frontend-audit
+
+      - name: Backend vulnerability scan
+        run: make backend-vulncheck
+
+  rag-smoke:
+    name: RAG smoke (sans DB)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Run smoke pipeline
+        run: make rag-debug-pipeline
+
+  rag-integration:
+    name: RAG integration (pgvector)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: rag-smoke
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Prepare env
+        run: make env
+
+      - name: Start PostgreSQL+pgvector
+        run: make db-up
+
+      - name: Wait for postgres healthcheck
+        run: docker compose ps postgres
+
+      - name: Init pgvector schema
+        run: make init-db
+
+      - name: Index RAG corpus
+        run: make rag-index
+
+      - name: Run RAG query
+        run: make rag-query Q="Quels sont les arguments principaux de cette votation ?"

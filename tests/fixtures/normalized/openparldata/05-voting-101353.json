@@ -1,0 +1,87 @@
+{
+  "source_system": "openparldata",
+  "source_org": "OpenParlData.ch",
+  "fetched_at_utc": "2026-03-13T21:22:17Z",
+  "selection_strategy": "fallback_past",
+  "available_languages": [
+    "de"
+  ],
+  "voting": {
+    "id": 101353,
+    "url_api": "https://api.openparldata.ch/v1/votings/101353",
+    "body_key": "AG",
+    "external_id": "6846786_1",
+    "date": "2026-03-10T14:29:53",
+    "title": {
+      "de": "Abstimmung (Abschreibung)"
+    },
+    "affair_id": 256532,
+    "affair_title": {
+      "de": "Konkrete Prüfung wirkungsorientierter Verbesserungen im Kindes- und Erwachsenenschutz (KESB)"
+    },
+    "meaning_of_yes": {
+      "de": "Für die Abschreibung = Ja-Gegen die Abschreibung = Nein-"
+    },
+    "meaning_of_no": {},
+    "links": {
+      "affairs": "https://api.openparldata.ch/v1/votings/101353/affairs"
+    }
+  },
+  "affair": {
+    "id": 256532,
+    "url_api": "",
+    "external_id": "6663237",
+    "title": {
+      "de": "Konkrete Prüfung wirkungsorientierter Verbesserungen im Kindes- und Erwachsenenschutz (KESB)"
+    },
+    "title_long": {
+      "de": "Postulat der GLP-Fraktion (Sprecherin Béa Bieber, Rheinfelden) vom 9. September 2025 betreffend konkrete Prüfung wirkungsorientierter Verbesserungen im Kindes- und Erwachsenenschutz (KESB)"
+    },
+    "type_name": {
+      "de": "Postulat"
+    },
+    "state_name": {
+      "de": "Offen"
+    },
+    "links": {
+      "contributors": "",
+      "docs": "",
+      "texts": ""
+    }
+  },
+  "initiants": [
+    {
+      "fullname": "GLP-Fraktion",
+      "party": "GLP",
+      "role": "Auteur"
+    }
+  ],
+  "arguments": {
+    "contra": "indisponible",
+    "pro": "REGIERUNGSRAT 26. November 2025 25.259 Postulat der GLP-Fraktion (Sprecherin Béa Bieber, Rheinfelden) vom 9. September 2025 be- treffend konkrete Prüfung wirkungsorientierter Verbesserungen im Kindes- und Erwachse- nenschutz (KESB); Entgegennahme unter gleichzeitiger Abschreibung I. Text und Begründung des Postulats wurden den Mitgliedern des Grossen Rats unmittelbar nach der Einreichung zugestellt. II. Der Regierungsrat nimmt das Postulat entgegen und beantragt mit folgender Begründung die gleich- zeitige Abschreibung: 1. Vorbemerkungen 1. Die Justizleitung der Gerichte Kanton Aargau ist das oberste Führungsorgan der Aargauer Gerichte sowie der Justizverwaltung. Ihr obliegt somit die Verantwortung und die direkte Aufsicht über alle Richterinnen und Richter sowie die richterlichen Behörden. Kindes- und Erwachsenenschutzbehörde (KESB) ist das Familiengericht (§ 21 Abs. 1 Einführungsgesetz zum Schweizerischen Zivilgesetz- buch [EG ZGB]). Aufsichtsbehörde über die KESB ist das Obergericht (Zivilgericht; § 21 Abs. 2 EG ZGB). Die vorliegende Beantwortung erfolgte daher unter Einbezug der Justizleitung. 2. In der folgenden Beantwortung wird der Begriff \"KESB\" für die Kindes- und Erwachsenenschutzbe- hörde (Familiengericht) verwendet. Teile der im Postulat genannten Punkte betreffen nicht die Ge- richte als KESB, sondern die Gemeinden beziehungsweise deren für den Kindes- und Erwachsenen- schutz zuständige Stellen wie Sozialdienste oder Kindes- und Erwachsenenschutzdienste (KESD), weshalb darauf aufgrund fehlender kantonaler Zuständigkeit kein Bezug genommen werden kann. 2. Zu den einzelnen Punkten 2.1 Reduktion von Verfahrensrückständen und langen Bearbeitungszeiten Eine Analyse der bestehenden Rückstands- und Monitoringprozesse, eine Prüfung von zusätz... GROSSER RAT GR.25.259 VORSTOSS Postulat der GLP-Fraktion (Sprecherin Béa Bieber, Rheinfelden) vom 9. September 2025 be- treffend konkrete Prüfung wirkungsorientierter Verbesserungen im Kindes- und Erwachse- nenschutz (KESB) Text: Der Regierungsrat wird beauftragt, dem Grossen Rat einen Bericht mit Vorschlägen zu unterbreiten, wie der Kindes- und Erwachsenenschutz im Kanton Aargau (KESB) wirkungsorientiert und strukturell verbessert werden kann. Begründung: Die KESB ist für den Schutz besonders vulnerabler Personen zuständig. Trotz bestehender Monito- ringinstrumente bestehen laut Rü..."
+  },
+  "docs": [
+    {
+      "name": "Abstimmungsprotokoll mit Namenslisten",
+      "url": "https://www.ag.ch/grossrat/grweb/de/147/Startseite?FrmEntity=grweb.modules.dok.GrDok\u0026FrmRequest=Download\u0026DokId=6846786\u0026Extension=.pdf",
+      "date": "2026-03-10T00:00:00",
+      "format": "application/pdf",
+      "text": "Grossratssitzung vom 10. März 2026 Agenda Untertitel 25.259 Agenda BeschreibungPostulat der GLP-Fraktion (Sprecherin Béa Bieber, Rheinfelden) vom 9. September 2025 betreffend konkrete Prüfung wirkungsorientierter Verbesserungen im Kindes- und Erwachsenenschutz (KESB) AbstimmungstitelAbstimmung (Abschreibung) AbstimmungsmodusOffen Abstimmungsdatum10.03.2026 14:29 Voting ID 930 AbstimmungsfrageFür die Abschreibung = Ja-Gegen die Abschreibung = Nein- Ergebnis Anwesend 135 Stimmberechtigt 135 Ja + 67 Nein - 65 Enthalten x 0 Abgestimmt: 132 Nicht abgestimmt 3 Individuelle Ergebnisse ID Name Partei Wohnort Ergebnis 46 Abt Lukas SVP Brittnau Ja + 26 Aebi Daniel Erich SVP Birmenstorf Ja + 107 Barp Miro SVP Brugg Ja + 97 Basler Colette SP Zeihen Ja + 42 Baumann Thomas Grüne Suhr Nein - 54 Baumgartner Simon SVP Menziken Ja + 126 Baumgartner Monika Die Mitte Tegerfelden Nein - 93 Baur Jürg Die Mitte Brugg Nein - 59 Berner Yannick FDP Aarau Nicht abgestimmt 38 Betsche Matthias GLP Möriken-WildeggNein - 37 Bieber Béa GLP Rheinfelden Nein - 91 Binder Simon Die Mitte Baden Nein - 133 Binder-Meury Carole SP Magden Ja + 61 Bircher Adrian GLP Aarau Nein - 78 Bodmer René SVP UnterlunkhofenJa + 115 Borer-Mathys BarbaraSVP Holziken Ja + 7 Bossert Martin EDU Rothrist Ja + 94 Brem-Ingold Rita Die Mitte Oberwil-Lieli Nein - 68 Brügger Martin SP Brugg Nein - 66 Bucher Ralf Die Mitte Mühlau Nein - 36 Budmiger Hans-Peter GLP Muri Nein - 4 Burger Nicole SVP Aarau Ja + 138 Burger Alain SP Wettingen Ja + 139 Burkard Flurin SP Waltenschwil Ja + 110 Bütler Alain SVP Kallern Ja + 100 Capanni Luzia SP Windisch Nein - 103 Demarmels Carol SP ObersiggenthalJa + 12 Dietiker Therese EVP Aarau Nein - 98 Dietrich Stefan SP Bremgarten Ja + 32 Egloff Martin FDP Wettingen Nicht anwesend 70 Engeli Lucia SP UnterentfeldenJa + 10 Ernst Thomas FDP Magden Nein - 63 Ernst Manuela GLP Wettingen Nein - 69 Fedeli Marius SP Buchs Ja + 117 Felder Jacqueline SVP Boniswil Ja + 116 Fiechter René SVP HunzenschwilJa + 14 Fischer Lutz EVP Wettingen Nein - 44 Fischer Bargetzi AndreasGrüne Möhlin Nein - 122 Freiermuth Sabina FDP Zofingen Nein - 40 Fricker Jonas Grüne Baden Nein - 114 Furer Pascal SVP Staufen Ja + 1 Gabriel Markus SVP Uerkheim Ja + 23 Gassner-Ruf Rahel SVP Zofingen Ja + 21 Gerhard Kurt SVP Brittnau Ja + 24 Gerny Marcel SVP Neuenhof Ja + 50 Giezendanner Stefan SVP Baden Ja + 87 Glarner Jeanine FDP Möriken-WildeggNein - 27 Gosteli Patrick SVP Böttstein Ja + 112 Gratwohl Mario SVP Niederwil Ja + 39 Gresch Dominik GLP Zofingen Nein - 18 Grieder Julia Rahel Grüne Brugg Nein - 80 Hagenbuch ChristophSVP OberlunkhofenJa + 8 Haldimann Roland EDU OberentfeldenJa + 6 Haller Rolf EDU Zetzwil Ja + 120 Hauser Claudia FDP Döttingen Nein - 82 Häusermann Renate SVP Seengen Ja + 109 Heggli-Boder Nicole SVP Buttwil Ja + 60 Hilfiker Hanspeter FDP Aarau Nein - 88 Hilfiker Silvan FDP Jonen Nicht anwesend 5 Hochreuter Clemens SVP Erlinsbach Nicht abgestimmt 20 Hölzle Daniel Grüne Zofingen Nein - 58 Hottiger Tobias FDP Zofingen Nein - 35 Huber Lukas GLP Berikon Nein - 71 Hubmann Hanspeter SP Schneisingen Ja + 101 Hunziker Lelia SP Aarau Nein - 121 Huwyler Stefan FDP Muri Nein - 81 Jäggi Rolf SVP Seengen Nicht anwesend 95 Jegge Severine Die Mitte Oberrohrdorf Nein - 137 Jenni Mia SP ObersiggenthalJa + 33 Jenny Johannes FDP Baden Nein - 9 Käser Beat FDP Stein Nein - 53 Kaspar Manuel SVP Oberkulm Ja + 43 Kaufmann Maurus Grüne Seon Nein - 123 Kaufmann Alfons PaulDie Mitte Wallbach Nein - 64 Kern Knecht Leandra GLP Windisch Nein - 124 Koch Wick Karin Die Mitte Bremgarten Nein - 79 Köpfli Stefanie SVP Arni Ja + 16 Kosch Mirjam Grüne Aarau Nein - 51 Kuster Petra SVP Neuenhof Ja + 62 Lang Markus GLP Brugg Nein - 67 Lanz Lucia SP Beinwil am SeeNein - 89 Laube Philipp Die Mitte Lengnau Nein - 135 Lauper Richner Gabi SP Niederlenz Ja + 17 Lüscher Severin Grüne Schöftland Ja + 3 Lüthy Markus SVP Erlinsbach Ja + 125 Lütolf Harry Die Mitte Wohlen Nein - 29 Mäder Michael SVP D\ufffd..."
+    },
+    {
+      "name": "Stellungnahme RR; Entgegennahme unter gleichzeitiger Abschreibung",
+      "url": "https://www.ag.ch/grossrat/grweb/de/147/Startseite?FrmEntity=grweb.modules.dok.GrDok\u0026FrmRequest=Download\u0026DokId=6757986\u0026Extension=.pdf",
+      "date": "2025-11-26T00:00:00",
+      "format": "application/pdf",
+      "text": "REGIERUNGSRAT 26. November 2025 25.259 Postulat der GLP-Fraktion (Sprecherin Béa Bieber, Rheinfelden) vom 9. September 2025 be- treffend konkrete Prüfung wirkungsorientierter Verbesserungen im Kindes- und Erwachse- nenschutz (KESB); Entgegennahme unter gleichzeitiger Abschreibung I. Text und Begründung des Postulats wurden den Mitgliedern des Grossen Rats unmittelbar nach der Einreichung zugestellt. II. Der Regierungsrat nimmt das Postulat entgegen und beantragt mit folgender Begründung die gleich- zeitige Abschreibung: 1. Vorbemerkungen 1. Die Justizleitung der Gerichte Kanton Aargau ist das oberste Führungsorgan der Aargauer Gerichte sowie der Justizverwaltung. Ihr obliegt somit die Verantwortung und die direkte Aufsicht über alle Richterinnen und Richter sowie die richterlichen Behörden. Kindes- und Erwachsenenschutzbehörde (KESB) ist das Familiengericht (§ 21 Abs. 1 Einführungsgesetz zum Schweizerischen Zivilgesetz- buch [EG ZGB]). Aufsichtsbehörde über die KESB ist das Obergericht (Zivilgericht; § 21 Abs. 2 EG ZGB). Die vorliegende Beantwortung erfolgte daher unter Einbezug der Justizleitung. 2. In der folgenden Beantwortung wird der Begriff \"KESB\" für die Kindes- und Erwachsenenschutzbe- hörde (Familiengericht) verwendet. Teile der im Postulat genannten Punkte betreffen nicht die Ge- richte als KESB, sondern die Gemeinden beziehungsweise deren für den Kindes- und Erwachsenen- schutz zuständige Stellen wie Sozialdienste oder Kindes- und Erwachsenenschutzdienste (KESD), weshalb darauf aufgrund fehlender kantonaler Zuständigkeit kein Bezug genommen werden kann. 2. Zu den einzelnen Punkten 2.1 Reduktion von Verfahrensrückständen und langen Bearbeitungszeiten Eine Analyse der bestehenden Rückstands- und Monitoringprozesse, eine Prüfung von zusätzlichen Steuerungsinstrumenten und eine Evaluation von Ressourcenverschiebungen- oder Erhöhungen 2 von 5 sind nicht zielführend. Die Arbeit der Familiengerichte als KESB wird bereits durch Rückstandslisten, Pendenzenkontrollen und die Aufsicht der Kammer für Kindes- und Erwachsenenschutzes (KEKA) sowie der Aufsichtskommission der Gerichte Kanton Aargau eng gesteuert. Die Rückstandslisten ha- ben die Bezirksgerichte für alle ihre Abteilungen, auch für jene Verfahren, in denen sie als KESB am- ten, halbjährlich der Aufsichtskommission einzureichen. Darauf sind alle Verfahren aufzuführen, die innerhalb einer pro Verfahrenskategorie definierten, durchschnittlich noch angemessenen Frist nicht erledigt worden sind, mit den Angaben für die Gründe der langen Verfahrensdauer und dazu, ob das Verfahren in der Zwischenzeit abgeschlossen werden konnte. Die Aufsichtskommission prüft, ob die Verzögerungen mit den Besonderheiten des Verfahrens zu erklären sind oder auf Ineffizienzen oder Versäumnisse schliessen lassen. Sie stellt nötigenfalls Rückfragen bei den Familiengerichten und berichtet der Justizleitung, welche gegebenenfalls Massnahmen trifft. Im Rahmen der jährlich stattfin- denden Inspektionen bespricht ein Mitglied der Aufsichtskommission mit dem geschäftsführenden Mitglied der Bezirksgerichte allfällige Schwierigkeiten bei der Aufgabenerledigung, wozu insbeson- dere auffällig lange Verfahrensdauern auch im KESB-Bereich gehören können. Auch zu den Inspek- tionen berichtet die Aufsichtskommission gegenüber der Justizleitung und empfiehlt nötigenfalls die Ergreifung von Massnahmen. Eine Verkürzung der Verfahrensdauer liesse sich vor allem durch Anstrengungen zum Abbau der langen Bearbeitungszeiten bei den für den Kindes- und Erwachsenenschutz zuständigen Stellen der Gemeinden erreichen. Guter und effizienter behördlicher Kindesschutz (durch die Familiengerichte als KESB) ist zudem auf vorgelagerte Angebote in ausreichender Qualität und Quantität angewiesen. Insbesondere durch einen flächendeckenden Ausbau der vorgelagerten Dienstleistungen, welche niederschwellige, freiwillige Massnahmen anbieten, können die Ressourcen der Familiengeri..."
+    },
+    {
+      "name": "Postulatstext",
+      "url": "https://www.ag.ch/grossrat/grweb/de/147/Startseite?FrmEntity=grweb.modules.dok.GrDok\u0026FrmRequest=Download\u0026DokId=6663526\u0026Extension=.pdf",
+      "date": "2025-09-09T00:00:00",
+      "format": "application/pdf",
+      "text": "GROSSER RAT GR.25.259 VORSTOSS Postulat der GLP-Fraktion (Sprecherin Béa Bieber, Rheinfelden) vom 9. September 2025 be- treffend konkrete Prüfung wirkungsorientierter Verbesserungen im Kindes- und Erwachse- nenschutz (KESB) Text: Der Regierungsrat wird beauftragt, dem Grossen Rat einen Bericht mit Vorschlägen zu unterbreiten, wie der Kindes- und Erwachsenenschutz im Kanton Aargau (KESB) wirkungsorientiert und strukturell verbessert werden kann. Begründung: Die KESB ist für den Schutz besonders vulnerabler Personen zuständig. Trotz bestehender Monito- ringinstrumente bestehen laut Rückmeldungen aus Fachkreisen, Gemeinden und der Bevölkerung weiterhin gravierende Herausforderungen, darunter hohe Fallrückstände, lange Bearbeitungszeiten und eine unzureichende Priorisierung akuter Fälle. Verzögerungen entstehen häufig aufgrund quali- tativ ungenügender oder verspäteter Sozialdienstberichte. Gleichzeitig wächst die Belastung durch Bevölkerungswachstum, gesellschaftliche Veränderungen und den Fachkräftemangel stetig. Eine wirkungsorientierte Optimierung der Prozesse, die Stärkung der vorgelagerten Angebote sowie ein strukturierter Blick über die Kantonsgrenzen hinaus sind notwendig, um den Schutz von Kindern und hilfsbedürftigen Erwachsenen nachhaltig zu gewährleisten. Dabei sind insbesondere folgende Punkte zu prüfen: 1. Reduktion von Verfahrensrückständen und langen Bearbeitungszeiten • Analyse der bestehenden Rückstands- und Monitoringprozesse sowie Prüfung zusätzlicher Steu- erungsinstrumente, um die Verfahrensdauer bei Gefährdungsmeldungen messbar zu verkürzen. • Evaluation von Ressourcenverschiebungen oder -erhöhungen im KESB-Bereich in Relation zur Bevölkerungsentwicklung. 2. Priorisierung nach Dringlichkeit • Entwicklung klarer, fachlich fundierter Kriterien zur Priorisierung von Fällen, um bei besonders ge- fährdeten Gruppen (z. B. Kleinkinder, suizidgefährdete Jugendliche) eine schnellstmögliche Inter- vention sicherzustellen. 3. Qualitätssicherung bei vorgelagerten Abklärungen • Erarbeitung und Umsetzung eines kantonalen Qualitäts- und Controllingkonzepts für die von Ge- meinden erstellten Sozial- und Abklärungsberichte, um Verzögerungen und Mehrbelastungen der KESB zu reduzieren. 2 von 2 4. Kantonaler Vergleich und Best Practices • Durchführung einer Standortbestimmung im Vergleich der Aargauer Bezirke, in denen der Kindes- und Erwachsenenschutz nachweislich effizienter und wirksamer arbeitet. • Prüfung der Übernahme erfolgreicher Modelle, insbesondere im Hinblick auf Organisation, Perso- nalstruktur und Kooperationsmechanismen. 5. Förderung vorgelagerter Unterstützungsangebote • Analyse bestehender Angebotslücken bei präventiven Diensten (z. B. Mütter-/Väterberatung, Kin- der- und Jugendberatung, Schulsozialarbeit) und Erarbeitung von Konzepten zum gezielten Aus- bau dieser Angebote, um den Bedarf an KESB-Massnahmen zu senken."
+    }
+  ],
+  "texts": []
+}

@@ -1,0 +1,33 @@
+llm:
+  enabled: false
+  base_url: "https://example-llm.local"
+  api_key: "replace-me"
+  model_name: "model-placeholder"
+  timeout: "10s"
+  max_prompt_chars: 4000
+
+llm_embedding:
+  enabled: false
+  base_url: "https://example-llm.local"
+  api_key: "replace-me"
+  model_name: "embedding-model-placeholder"
+  timeout: "10s"
+  max_input_chars: 4000
+
+postgres:
+  host: "127.0.0.1"
+  port: "5432"
+  user: "postgres"
+  password: "replace-me"
+  db_name: "civika"
+  sslmode: "disable"
+  max_open_conns: 10
+  max_idle_conns: 5
+
+rag:
+  mode: "local"
+  top_k: 5
+  chunk_size_tokens: 768
+  chunk_overlap_ratio: 0.15
+  table_name: "rag_chunks"
+  embedding_dimensions: 128

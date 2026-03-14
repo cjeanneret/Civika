@@ -1,0 +1,76 @@
+---
+description: Standard strict des messages de commit (qualité, transparence IA, co-auteur, signature SSH)
+alwaysApply: true
+---
+
+# Règle Commit (format + transparence IA)
+
+## Objectif
+- Garantir des commits lisibles, auditables et signés.
+- Imposer une transparence radicale sur l'assistance IA utilisée.
+
+## Format obligatoire du message
+- Le message respecte le style Conventional Commits:
+  - `<type>(<scope optionnel>): <sujet>`
+  - types autorisés: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `build`, `ci`, `perf`, `revert`.
+- Sujet:
+  - impératif, sans point final,
+  - longueur maximale: 50 caractères.
+- Corps:
+  - obligatoire sauf commit trivial,
+  - explique le "pourquoi" et l'impact,
+  - lignes limitées à 72 caractères.
+- Footer:
+  - obligatoire si assistance IA, co-auteur ou références,
+  - précédé d'une ligne vide après le corps.
+
+## Footer obligatoire de transparence IA
+- Quand une IA a contribué (même partiellement), inclure un footer
+  explicite et aussi exhaustif que possible.
+- Utiliser les trailers suivants (un trailer par ligne):
+  - `AI-Assisted: yes`
+  - `AI-Software: <liste des logiciels/agents/outils IA utilisés>`
+  - `AI-Models: <liste des modèles utilisés>`
+  - `AI-Usage: <rôle précis: génération, refactor, review, tests, etc.>`
+- Exemples de valeur pour `AI-Software` (adapter au cas réel):
+  - `Cursor IDE`, `Cursor Agent`, `GitHub Copilot`, `Claude Code`.
+- Exemples de valeur pour `AI-Models` (adapter au cas réel):
+  - `GPT-5.3-Codex`, `Claude Sonnet`, `Gemini`.
+- Si une information n'est pas connue avec certitude, indiquer
+  explicitement `unknown` plutôt que d'omettre le trailer.
+
+## Co-auteur IA obligatoire
+- Si l'IA a contribué, ajouter en footer:
+  - `Co-authored-by: GPT-5.3 Codex (Cursor) <assistant@openai.com>`
+- Ne jamais supprimer le co-auteur IA quand l'assistance est réelle.
+
+## Signature SSH obligatoire
+- Tous les commits doivent être signés via clé SSH et `ssh-agent`.
+- Exigences:
+  - agent SSH actif,
+  - clé SSH de signature chargée dans l'agent,
+  - commit créé avec signature (`git commit -S`).
+- Pour les commits réalisés par l'agent Cursor:
+  - exécuter la commande de commit hors sandbox (permissions `all`)
+    afin d'accéder à l'agent SSH local.
+  - En cas d'impossibilité de signature, ne pas fallback silencieusement:
+    arrêter le flux et remonter une erreur explicite.
+
+## Template recommandé
+- Format minimal attendu:
+  - sujet Conventional Commit (<= 50 caractères),
+  - corps (lignes <= 72 caractères),
+  - footer complet.
+
+Exemple:
+
+`fix(api): handle empty federal vote dataset`
+
+`Reject empty payloads to prevent invalid ingest states.`
+`Adds explicit validation and clearer error mapping in HTTP layer.`
+
+`AI-Assisted: yes`
+`AI-Software: Cursor IDE, Cursor Agent`
+`AI-Models: GPT-5.3-Codex`
+`AI-Usage: code generation, refactor guidance, commit drafting`
+`Co-authored-by: GPT-5.3 Codex (Cursor) <assistant@openai.com>`
