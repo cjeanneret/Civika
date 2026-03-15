@@ -65,7 +65,7 @@ func QueryRAG(ctx context.Context, store VectorStore, embedder Embedder, questio
 }
 
 type Summarizer interface {
-	Summarize(ctx context.Context, question string, hits []SearchHit) (string, error)
+	Summarize(ctx context.Context, question string, hits []SearchHit, language string) (string, error)
 	Name() string
 }
 
@@ -108,7 +108,7 @@ func (s *LLMSummarizer) Name() string {
 	return "llm"
 }
 
-func (s *LLMSummarizer) Summarize(ctx context.Context, question string, hits []SearchHit) (string, error) {
+func (s *LLMSummarizer) Summarize(ctx context.Context, question string, hits []SearchHit, language string) (string, error) {
 	if strings.TrimSpace(question) == "" {
 		return "", errors.New("question is required")
 	}
@@ -116,7 +116,7 @@ func (s *LLMSummarizer) Summarize(ctx context.Context, question string, hits []S
 		return "", errors.New("hits are required")
 	}
 
-	prompt := buildSummaryPrompt(question, hits, s.cfg.MaxPromptChars)
+	prompt := buildSummaryPrompt(question, hits, s.cfg.MaxPromptChars, language)
 	if len(prompt) > s.cfg.MaxPromptChars {
 		prompt = prompt[:s.cfg.MaxPromptChars]
 	}
@@ -333,17 +333,18 @@ func (s *DeterministicSummarizer) Name() string {
 	return "deterministic"
 }
 
-func (s *DeterministicSummarizer) Summarize(_ context.Context, _ string, hits []SearchHit) (string, error) {
+func (s *DeterministicSummarizer) Summarize(_ context.Context, _ string, hits []SearchHit, language string) (string, error) {
 	if len(hits) == 0 {
 		return "", errors.New("hits are required")
 	}
 	highlights := collectDeterministicHighlights(hits, 2, 220)
 	if len(highlights) == 0 {
-		return "Resume deterministe indisponible: aucune source exploitable.", nil
+		return deterministicNoSourceMessage(language), nil
 	}
 
 	var b strings.Builder
-	b.WriteString("Resume deterministe base sur les sources indexees (LLM desactive). ")
+	b.WriteString(deterministicPrefix(language))
+	b.WriteString(" ")
 	for i, sentence := range highlights {
 		if i > 0 {
 			b.WriteString(" ")
@@ -431,14 +432,14 @@ func ensureSentenceEnding(value string) string {
 	return clean + "."
 }
 
-func ExplainVotation(ctx context.Context, summarizer Summarizer, question string, hits []SearchHit) (string, error) {
+func ExplainVotation(ctx context.Context, summarizer Summarizer, question string, hits []SearchHit, language string) (string, error) {
 	if summarizer == nil {
 		return "", errors.New("summarizer is required")
 	}
-	return summarizer.Summarize(ctx, question, hits)
+	return summarizer.Summarize(ctx, question, hits, language)
 }
 
-func buildSummaryPrompt(question string, hits []SearchHit, maxPromptChars int) string {
+func buildSummaryPrompt(question string, hits []SearchHit, maxPromptChars int, language string) string {
 	var b strings.Builder
 	b.WriteString("Question utilisateur (sanitisee):\n")
 	b.WriteString(question)
@@ -480,8 +481,59 @@ func buildSummaryPrompt(question string, hits []SearchHit, maxPromptChars int) s
 		usedBudget += len(chunkText)
 		b.WriteString("\n")
 	}
-	b.WriteString("\nProduis un resume factuel en francais en 1 ou 2 phrases maximum, uniquement base sur ces sources.")
+	b.WriteString("\n")
+	b.WriteString(summaryInstruction(language))
 	return b.String()
+}
+
+func summaryInstruction(language string) string {
+	normalized := normalizeSummaryLanguage(language)
+	return fmt.Sprintf(
+		"Return the answer strictly in language code %q, in 1 or 2 factual sentences maximum, using only these sources.",
+		normalized,
+	)
+}
+
+func normalizeSummaryLanguage(language string) string {
+	normalized := normalizeNonEmpty(language, "fr")
+	normalized = strings.ToLower(strings.TrimSpace(normalized))
+	if idx := strings.IndexByte(normalized, '-'); idx > 0 {
+		normalized = normalized[:idx]
+	}
+	if normalized == "" {
+		return "fr"
+	}
+	return normalized
+}
+
+func deterministicPrefix(language string) string {
+	switch normalizeSummaryLanguage(language) {
+	case "de":
+		return "Deterministische Zusammenfassung basierend auf indexierten Quellen (LLM deaktiviert)."
+	case "it":
+		return "Riassunto deterministico basato su fonti indicizzate (LLM disattivato)."
+	case "rm":
+		return "Resum deterministic basau sin funtaunas indexadas (LLM deactivau)."
+	case "en":
+		return "Deterministic summary based on indexed sources (LLM disabled)."
+	default:
+		return "Resume deterministe base sur les sources indexees (LLM desactive)."
+	}
+}
+
+func deterministicNoSourceMessage(language string) string {
+	switch normalizeSummaryLanguage(language) {
+	case "de":
+		return "Deterministische Zusammenfassung nicht verfugbar: keine nutzbare Quelle."
+	case "it":
+		return "Riassunto deterministico non disponibile: nessuna fonte utilizzabile."
+	case "rm":
+		return "Resum deterministic betg disponibel: nagina funtauna utilisabla."
+	case "en":
+		return "Deterministic summary unavailable: no usable source."
+	default:
+		return "Resume deterministe indisponible: aucune source exploitable."
+	}
 }
 
 func formatIntervenants(intervenants []Intervenant) string {

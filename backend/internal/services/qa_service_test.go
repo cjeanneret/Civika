@@ -80,9 +80,9 @@ func (s *qaTestSummarizer) Name() string {
 	return "mock"
 }
 
-func (s *qaTestSummarizer) Summarize(_ context.Context, question string, _ []rag.SearchHit) (string, error) {
+func (s *qaTestSummarizer) Summarize(_ context.Context, question string, _ []rag.SearchHit, language string) (string, error) {
 	s.calls++
-	return "Reponse: " + strings.TrimSpace(question), nil
+	return "Reponse (" + strings.TrimSpace(language) + "): " + strings.TrimSpace(question), nil
 }
 
 func TestQAServiceExactCacheHitSkipsRepeatedLLMPath(t *testing.T) {

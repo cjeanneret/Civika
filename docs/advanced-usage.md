@@ -30,6 +30,12 @@
   - `QA_CACHE_SEMANTIC_SIMILARITY_THRESHOLD`
   - `QA_CACHE_SEMANTIC_MIN_QUESTION_CHARS`
 
+## Langue QA visiteur
+- Langues supportees: `fr`, `de`, `it`, `rm`, `en` (alignees sur `RAG_SUPPORTED_LANGUAGES`).
+- Priorite de resolution QA: `body.language` > header `Accept-Language` > `RAG_DEFAULT_LANGUAGE`.
+- `body.language` est strictement valide contre la whitelist; toute langue hors scope retourne `400`.
+- Si `body.language` est vide, le backend tente `Accept-Language` (ex: `de-CH` -> `de`), sinon retombe sur la langue par defaut.
+
 ## Reduction tokens (quick wins)
 - Resume QA contraint a une sortie courte (1 a 2 phrases) cote prompt.
 - Les retries de traduction sont controles par `LLM_TRANSLATION_MAX_RETRIES`.

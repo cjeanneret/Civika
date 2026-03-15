@@ -37,6 +37,8 @@ func NewRouter(cfg config.Config, deps RouterDependencies) http.Handler {
 		qaCacheMetrics:  deps.QACacheMetrics,
 		apiVersion:      deps.APIVersion,
 		ragMode:         deps.RAGMode,
+		supportedLangs:  cfg.RAG.SupportedLanguages,
+		defaultLang:     cfg.RAG.DefaultLanguage,
 	}
 
 	r.Get("/", handlers.rootHandler)

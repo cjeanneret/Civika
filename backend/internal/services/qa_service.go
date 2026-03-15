@@ -56,9 +56,10 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 	}
 
 	safeQuestion := sanitizeQuestion(question)
+	resolvedLanguage := normalizeLanguage(input.Language)
 	cacheableQuestion := isCacheableQuestion(safeQuestion)
 	cacheCtx := qaCacheContext{
-		Language:       normalizeLanguage(input.Language),
+		Language:       resolvedLanguage,
 		VotationID:     strings.TrimSpace(input.Context.VotationID),
 		ObjectID:       strings.TrimSpace(input.Context.ObjectID),
 		Canton:         strings.TrimSpace(input.Context.Canton),
@@ -146,8 +147,8 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 	}
 	if len(hits) == 0 {
 		output := QAQueryOutput{
-			Answer:    "Aucune source pertinente n'a ete trouvee.",
-			Language:  normalizeLanguage(input.Language),
+			Answer:    noRelevantSourceMessage(resolvedLanguage),
+			Language:  resolvedLanguage,
 			Citations: []Citation{},
 			Meta: QAQueryMeta{
 				Confidence:    0,
@@ -166,7 +167,7 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 	})
 	// #endregion
 	summaryStart := time.Now()
-	answer, err := rag.ExplainVotation(ctx, s.summarizer, safeQuestion, hits)
+	answer, err := rag.ExplainVotation(ctx, s.summarizer, safeQuestion, hits, resolvedLanguage)
 	// #region agent log
 	debuglog.Log(ctx, "H4", "backend/internal/services/qa_service.go:Query", "summarization end", map[string]any{
 		"durationMs":  time.Since(summaryStart).Milliseconds(),
@@ -199,7 +200,7 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 
 	output := QAQueryOutput{
 		Answer:    answer,
-		Language:  normalizeLanguage(input.Language),
+		Language:  resolvedLanguage,
 		Citations: dedupeCitations(citations),
 		Meta: QAQueryMeta{
 			Confidence:    computeConfidence(hits),
@@ -210,6 +211,21 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 		s.cache.Set(safeQuestion, queryVector, cacheCtx, output)
 	}
 	return output, nil
+}
+
+func noRelevantSourceMessage(language string) string {
+	switch normalizeLanguage(language) {
+	case "de":
+		return "Es wurden keine relevanten Quellen gefunden."
+	case "it":
+		return "Nessuna fonte pertinente trovata."
+	case "rm":
+		return "Nagina funtauna relevanta e vegnida chattada."
+	case "en":
+		return "No relevant source was found."
+	default:
+		return "Aucune source pertinente n'a ete trouvee."
+	}
 }
 
 func isCacheableQuestion(sanitizedQuestion string) bool {
