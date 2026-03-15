@@ -24,9 +24,10 @@ Ce document formalise:
 - Prioriser les optimisations "token governance" avant toute optimisation avancee.
 - Appliquer une separation stricte entre:
   - cache persistant d'artefacts publics (autorise),
-  - cache QA utilisateur durable (interdit).
+  - cache QA utilisateur durable brut (interdit).
 - Garder la selection de mode RAG explicite (`local`/`llm`) sans fallback silencieux.
-- Ne jamais stocker prompts/reponses QA utilisateur en persistance serveur.
+- Ne jamais stocker prompts/reponses QA utilisateur bruts en persistance serveur.
+- Le cache de questions est autorise uniquement apres sanitation stricte et sans metadonnee personnelle.
 
 ## Arborescence cible
 
@@ -162,18 +163,115 @@ flowchart TD
 - Seuil hard: blocage explicite des appels LLM (pas de fallback implicite).
 - Pilotage via config et metriques existantes.
 
-3. Cache QA memoire ephemere (privacy-safe)
-- TTL court (ex: 2-10 min), LRU, taille max stricte.
-- Cle hash non reversible, derivee de:
-  - question sanitizee,
-  - ids des documents sources utilises,
-  - mode/provider/model/prompt_version.
-- Pas de persistance disque/DB.
+3. Cache QA a deux niveaux (privacy-safe)
+- Niveau L1 exact cache:
+  - match exact sur hash de question sanitizee + contexte.
+  - faible risque de faux positifs, hit rapide.
+- Niveau L2 semantic cache:
+  - recherche vectorielle sur question sanitizee.
+  - seuil de similarite obligatoire + garde-fous de contexte.
+- Strategie de non-serving (cache miss force):
+  - similarite sous seuil,
+  - contexte incompatible (langue, votation/object, mode, modeles, versions),
+  - entree detectee comme sensible non sanitisee.
 
 4. Batching embeddings borne
 - Introduire `LLM_EMBEDDING_MAX_BATCH_ITEMS`.
 - Decouper les gros lots d'indexation.
 - Benefice: requetes plus stables et moins de retries couteux.
+
+## Design cache semantique (detail)
+
+### Flux de resolution
+
+```mermaid
+flowchart TD
+  qaRequest[QARequest] --> sanitizeInput[SanitizeInput]
+  sanitizeInput --> exactLookup[ExactCacheLookup]
+  exactLookup -->|hit| returnCached[ReturnCachedAnswer]
+  exactLookup -->|miss| semanticLookup[SemanticCacheLookup]
+  semanticLookup --> thresholdGate[SimilarityThresholdGate]
+  thresholdGate -->|pass| contextGate[ContextCompatibilityGate]
+  contextGate -->|pass| returnSemantic[ReturnSemanticCachedAnswer]
+  thresholdGate -->|fail| llmPath[LLMQueryPath]
+  contextGate -->|fail| llmPath
+  llmPath --> storeCache[StoreCacheEntry]
+  storeCache --> returnFresh[ReturnFreshAnswer]
+```
+
+### Regles de matching
+
+- L1 exact cache:
+  - cle derivee: `hash(questionSanitized + contextKey + cacheVersion)`.
+  - `contextKey` inclut au minimum:
+    - `lang`,
+    - `votationId` / `objectId` (si presents),
+    - `RAG_MODE`,
+    - `embeddingModel`,
+    - `generationModel`,
+    - `promptVersion`,
+    - `embeddingDimensions`,
+    - `indexVersion`.
+- L2 semantic cache:
+  - calcul embedding sur `questionSanitized`,
+  - recherche top-1 (ou top-k court) dans table vectorielle dediee,
+  - score minimal configurable (ex: 0.90 par defaut initial),
+  - verification contextuelle stricte avant serving.
+
+### Regles de non-serving
+
+- Toujours bypass cache si:
+  - score < seuil,
+  - mismatch de contexte ou version,
+  - entree contenant des traces potentiellement personnelles non sanitisees,
+  - entree trop courte/ambigue (ex: bruit ou demande non interpretable).
+- En cas de bypass:
+  - executer le chemin LLM standard,
+  - stocker uniquement si l'entree sanitisee est conforme.
+
+### Modele de donnees cible
+
+- Table logique `qa_semantic_cache` (nom final a confirmer):
+  - `cache_id` (pk technique),
+  - `question_sanitized` (texte nettoye),
+  - `question_hash` (hash non reversible),
+  - `question_embedding` (`vector(dim)`),
+  - `answer_text` (reponse QA),
+  - `answer_citations_hash` (controle de coherence),
+  - `lang`, `votation_id`, `object_id`,
+  - `rag_mode`, `embedding_model`, `generation_model`,
+  - `prompt_version`, `embedding_dimensions`, `index_version`,
+  - `created_at`, `last_hit_at`, `expires_at`, `hit_count`.
+- Index:
+  - index vectoriel sur `question_embedding`,
+  - index btree sur `(question_hash, lang, rag_mode, prompt_version, index_version)`,
+  - index sur `expires_at` pour purge.
+
+### Politique TTL, retention et purge
+
+- L1 exact cache:
+  - TTL court (ex: 10 min),
+  - evictions agressives (taille max en memoire).
+- L2 semantic cache:
+  - TTL moyen (ex: 24h) avec purge reguliere.
+- Invalidation forcee sur changement de:
+  - `RAG_MODE`,
+  - modeles LLM/embedding,
+  - `RAG_EMBEDDING_DIMENSIONS`,
+  - `promptVersion`,
+  - `indexVersion`.
+
+### Observabilite autorisee (sans contenu sensible)
+
+- Metriques:
+  - hit/miss L1 et L2,
+  - score moyen de similarite sur hits L2,
+  - latence lookup cache,
+  - taux de bypass pour mismatch contexte.
+- Logs autorises:
+  - IDs techniques, status, score, durees.
+- Logs interdits:
+  - prompts complets, reponses brutes non necessaires, IP/user-agent, PII.
 
 ## Phase 3 - Optimisations avancees (optionnelles)
 
@@ -192,6 +290,7 @@ flowchart TD
 - Persistant:
   - traductions de corpus public officiel,
   - embeddings de corpus public,
+  - questions QA sanitisees et dediees au cache semantique, sans identifiant personnel,
   - metadonnees techniques anonymes d'usage.
 - Ephemere memoire:
   - reponses QA transitoires non reliees a une identite.
@@ -199,15 +298,16 @@ flowchart TD
 ### Interdit
 
 - Stockage durable de:
-  - question utilisateur brute,
+  - question utilisateur brute non sanitisee,
   - prompt complet,
-  - reponse QA brute,
+  - reponse QA brute accompagnee de metadonnees personnelles,
   - IP, user-agent correlable, identifiant utilisateur.
 - Tables de profilage utilisateur (`users`, `profiles`, `sessions`, `histories`, `preferences`).
 
 ### Schema de cle et invalidation
 
-- Cle cache = hash(normalize(input) + mode + provider + model + promptVersion + dimensions)
+- Cle cache = hash(normalize(inputSanitized) + contextKey + cacheVersion)
+- `contextKey` inclut au minimum `lang`, `votationId/objectId`, `mode`, `provider`, `model`, `promptVersion`, `embeddingDimensions`, `indexVersion`.
 - Invalidation obligatoire sur changement de:
   - `RAG_MODE`,
   - modele LLM / fournisseur,
@@ -242,8 +342,14 @@ flowchart TD
   - support batch borne (si phase 2 activee).
 - `backend/cmd/civika-api/main.go`
   - cablage retries traduction + nouvelles configs.
-- (option phase 2) nouveau composant cache memoire QA:
-  - `backend/internal/services/qa_cache.go` (ou equivalent).
+- (phase 2) composants cache QA:
+  - `backend/internal/services/qa_cache.go` (L1 exact cache memoire),
+  - `backend/internal/services/qa_semantic_cache.go` (L2 semantic cache),
+  - `backend/internal/rag/cache_store.go` (acces persistant cache, ou equivalent).
+- `scripts/sql/init_pgvector.sql`
+  - table/index vectoriel du cache semantique QA.
+- `backend/config/config.go` + `.env.example` (+ `.env.test`)
+  - seuil similarite, TTL, capacites cache, version cache.
 
 ## Checklist de verification post-generation
 
@@ -255,6 +361,9 @@ flowchart TD
 - [ ] Aucun conflit avec regles `privacy.mdc` et `project.mdc`.
 - [ ] Procedure de verification securite/logging definie.
 - [ ] Documentation des futures variables de config prevue.
+- [ ] Tests de similarite L2: cas positifs et faux positifs.
+- [ ] Tests d'invalidation: changement modele/prompt/index/mode.
+- [ ] Tests privacy: aucune IP/PII en stockage et logs.
 
 ## Contraintes securite impactees
 

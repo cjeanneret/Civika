@@ -71,7 +71,8 @@ func main() {
 		DefaultLanguage:    cfg.RAG.DefaultLanguage,
 		FallbackLanguage:   cfg.RAG.FallbackLanguage,
 	})
-	qaService := services.NewQAService(store, embedder, summarizer, cfg.RAG.TopK, store, cfg.RAG.Mode)
+	qaCache := services.NewQACache(cfg.QACache)
+	qaService := services.NewQAService(store, embedder, summarizer, cfg.RAG.TopK, store, cfg.RAG.Mode, qaCache)
 
 	srv := &http.Server{
 		Addr: cfg.APIAddress(),

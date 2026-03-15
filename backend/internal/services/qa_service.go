@@ -27,9 +27,10 @@ type QAService struct {
 	topK       int
 	metrics    rag.UsageMetricsWriter
 	ragMode    string
+	cache      *QACache
 }
 
-func NewQAService(store rag.VectorStore, embedder rag.Embedder, summarizer rag.Summarizer, topK int, metrics rag.UsageMetricsWriter, ragMode string) *QAService {
+func NewQAService(store rag.VectorStore, embedder rag.Embedder, summarizer rag.Summarizer, topK int, metrics rag.UsageMetricsWriter, ragMode string, cache *QACache) *QAService {
 	if topK <= 0 {
 		topK = 5
 	}
@@ -40,6 +41,7 @@ func NewQAService(store rag.VectorStore, embedder rag.Embedder, summarizer rag.S
 		topK:       topK,
 		metrics:    metrics,
 		ragMode:    strings.TrimSpace(ragMode),
+		cache:      cache,
 	}
 }
 
@@ -54,6 +56,17 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 	}
 
 	safeQuestion := sanitizeQuestion(question)
+	cacheableQuestion := isCacheableQuestion(safeQuestion)
+	cacheCtx := qaCacheContext{
+		Language:       normalizeLanguage(input.Language),
+		VotationID:     strings.TrimSpace(input.Context.VotationID),
+		ObjectID:       strings.TrimSpace(input.Context.ObjectID),
+		Canton:         strings.TrimSpace(input.Context.Canton),
+		RAGMode:        normalizeNonEmptyString(s.ragMode, "unknown"),
+		EmbedderName:   normalizeNonEmptyString(s.embedder.Name(), "unknown"),
+		SummarizerName: normalizeNonEmptyString(s.summarizer.Name(), "unknown"),
+		TopK:           s.topK,
+	}
 	requestID := strings.TrimSpace(debuglog.RunIDFromContext(ctx))
 	ctx = rag.WithUsageScope(ctx, rag.UsageScope{
 		Flow:      "qa_query",
@@ -62,16 +75,53 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 		RunID:     requestID,
 	})
 	ctx = rag.WithUsageEmitter(ctx, s.recordUsageEvent)
+	if s.cache != nil && cacheableQuestion {
+		if exactOutput, hit := s.cache.GetExact(safeQuestion, cacheCtx); hit {
+			debuglog.Log(ctx, "H2", "backend/internal/services/qa_service.go:Query", "qa exact cache hit", map[string]any{
+				"questionChars": len(safeQuestion),
+			})
+			return exactOutput, nil
+		}
+	}
+
+	var (
+		hits        []rag.SearchHit
+		queryVector []float32
+		err         error
+	)
+	semanticAttempted := false
+	if s.cache != nil && cacheableQuestion && s.cache.IsSemanticEnabledForQuestion(safeQuestion) {
+		semanticAttempted = true
+		queryVector, err = s.embedder.EmbedQuery(ctx, safeQuestion)
+		if err != nil {
+			return QAQueryOutput{}, fmt.Errorf("embed query for semantic cache: %w", err)
+		}
+		if semanticOutput, score, hit := s.cache.GetSemantic(queryVector, safeQuestion, cacheCtx); hit {
+			debuglog.Log(ctx, "H2", "backend/internal/services/qa_service.go:Query", "qa semantic cache hit", map[string]any{
+				"score":         score,
+				"questionChars": len(safeQuestion),
+			})
+			return semanticOutput, nil
+		}
+	}
 	// #region agent log
 	debuglog.Log(ctx, "H2", "backend/internal/services/qa_service.go:Query", "query rag start", map[string]any{
 		"embedder":      s.embedder.Name(),
 		"summarizer":    s.summarizer.Name(),
 		"topK":          s.topK,
 		"questionChars": len(safeQuestion),
+		"semanticCache": semanticAttempted,
 	})
 	// #endregion
 	queryStart := time.Now()
-	hits, err := rag.QueryRAG(ctx, s.store, s.embedder, safeQuestion, s.topK)
+	if len(queryVector) > 0 {
+		hits, err = s.store.SearchSimilar(ctx, queryVector, s.topK)
+		if err != nil {
+			err = fmt.Errorf("search similar: %w", err)
+		}
+	} else {
+		hits, err = rag.QueryRAG(ctx, s.store, s.embedder, safeQuestion, s.topK)
+	}
 	// #region agent log
 	debuglog.Log(ctx, "H2", "backend/internal/services/qa_service.go:Query", "query rag end", map[string]any{
 		"durationMs": time.Since(queryStart).Milliseconds(),
@@ -83,7 +133,7 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 		return QAQueryOutput{}, err
 	}
 	if len(hits) == 0 {
-		return QAQueryOutput{
+		output := QAQueryOutput{
 			Answer:    "Aucune source pertinente n'a ete trouvee.",
 			Language:  normalizeLanguage(input.Language),
 			Citations: []Citation{},
@@ -91,7 +141,11 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 				Confidence:    0,
 				UsedDocuments: []string{},
 			},
-		}, nil
+		}
+		if s.cache != nil && cacheableQuestion {
+			s.cache.Set(safeQuestion, queryVector, cacheCtx, output)
+		}
+		return output, nil
 	}
 
 	// #region agent log
@@ -131,7 +185,7 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 	}
 	sort.Strings(usedDocs)
 
-	return QAQueryOutput{
+	output := QAQueryOutput{
 		Answer:    answer,
 		Language:  normalizeLanguage(input.Language),
 		Citations: dedupeCitations(citations),
@@ -139,7 +193,22 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 			Confidence:    computeConfidence(hits),
 			UsedDocuments: usedDocs,
 		},
-	}, nil
+	}
+	if s.cache != nil && cacheableQuestion {
+		s.cache.Set(safeQuestion, queryVector, cacheCtx, output)
+	}
+	return output, nil
+}
+
+func isCacheableQuestion(sanitizedQuestion string) bool {
+	value := strings.TrimSpace(sanitizedQuestion)
+	if value == "" {
+		return false
+	}
+	if strings.Contains(value, "[redacted-email]") || strings.Contains(value, "[redacted-phone]") {
+		return false
+	}
+	return true
 }
 
 func (s *QAService) recordUsageEvent(ctx context.Context, event rag.UsageEvent) {

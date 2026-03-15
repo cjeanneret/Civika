@@ -17,6 +17,7 @@ type Config struct {
 	IdleTimeout  time.Duration
 	BodyMaxBytes int64
 	QARateLimit  QARateLimitConfig
+	QACache      QACacheConfig
 	Debug        DebugConfig
 	LLM          LLMConfig
 	LLMEmbedding LLMEmbeddingConfig
@@ -28,6 +29,17 @@ type QARateLimitConfig struct {
 	QPS             float64
 	Burst           int
 	CleanupInterval time.Duration
+}
+
+type QACacheConfig struct {
+	Enabled                  bool
+	ExactTTL                 time.Duration
+	ExactMaxEntries          int
+	SemanticEnabled          bool
+	SemanticTTL              time.Duration
+	SemanticMaxEntries       int
+	SimilarityThreshold      float64
+	MinSemanticQuestionChars int
 }
 
 type DebugConfig struct {
@@ -94,6 +106,16 @@ func LoadFromEnv() Config {
 			Burst:           getEnvInt("API_QA_RATE_LIMIT_BURST", 3),
 			CleanupInterval: getEnvDuration("API_QA_RATE_LIMIT_CLEANUP_INTERVAL", time.Minute),
 		},
+		QACache: QACacheConfig{
+			Enabled:                  getEnvBool("QA_CACHE_ENABLED", false),
+			ExactTTL:                 getEnvDuration("QA_CACHE_EXACT_TTL", 10*time.Minute),
+			ExactMaxEntries:          getEnvInt("QA_CACHE_EXACT_MAX_ENTRIES", 500),
+			SemanticEnabled:          getEnvBool("QA_CACHE_SEMANTIC_ENABLED", false),
+			SemanticTTL:              getEnvDuration("QA_CACHE_SEMANTIC_TTL", 24*time.Hour),
+			SemanticMaxEntries:       getEnvInt("QA_CACHE_SEMANTIC_MAX_ENTRIES", 2000),
+			SimilarityThreshold:      getEnvFloat64("QA_CACHE_SEMANTIC_SIMILARITY_THRESHOLD", 0.90),
+			MinSemanticQuestionChars: getEnvInt("QA_CACHE_SEMANTIC_MIN_QUESTION_CHARS", 24),
+		},
 		Debug: DebugConfig{
 			Enabled: getEnvBool("DEBUG_LOG_ENABLED", false),
 			LogPath: getEnv("DEBUG_LOG_PATH", ""),
@@ -143,6 +165,24 @@ func LoadFromEnv() Config {
 	}
 	cfg.RAG.DefaultLanguage = normalizeLanguageWithPreferredFallback(cfg.RAG.DefaultLanguage, cfg.RAG.SupportedLanguages, "fr")
 	cfg.RAG.FallbackLanguage = normalizeLanguageWithPreferredFallback(cfg.RAG.FallbackLanguage, cfg.RAG.SupportedLanguages, "en")
+	if cfg.QACache.ExactTTL <= 0 {
+		cfg.QACache.ExactTTL = 10 * time.Minute
+	}
+	if cfg.QACache.ExactMaxEntries <= 0 {
+		cfg.QACache.ExactMaxEntries = 500
+	}
+	if cfg.QACache.SemanticTTL <= 0 {
+		cfg.QACache.SemanticTTL = 24 * time.Hour
+	}
+	if cfg.QACache.SemanticMaxEntries <= 0 {
+		cfg.QACache.SemanticMaxEntries = 2000
+	}
+	if cfg.QACache.SimilarityThreshold <= 0 || cfg.QACache.SimilarityThreshold > 1 {
+		cfg.QACache.SimilarityThreshold = 0.90
+	}
+	if cfg.QACache.MinSemanticQuestionChars < 1 {
+		cfg.QACache.MinSemanticQuestionChars = 24
+	}
 	return cfg
 }
 
