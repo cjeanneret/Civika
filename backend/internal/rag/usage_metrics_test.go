@@ -52,3 +52,48 @@ func TestParseUsageFromResponseBody_UnknownWhenMissing(t *testing.T) {
 		t.Fatalf("total tokens mismatch: got %d", usage.TotalTokens)
 	}
 }
+
+func TestNormalizeUsagePagination(t *testing.T) {
+	tests := []struct {
+		name         string
+		filter       UsageListFilter
+		wantLimit    int
+		wantOffset   int
+	}{
+		{
+			name:       "default limit when non positive",
+			filter:     UsageListFilter{Limit: 0, Offset: 5},
+			wantLimit:  UsageListDefaultLimit,
+			wantOffset: 5,
+		},
+		{
+			name:       "clamp limit when too high",
+			filter:     UsageListFilter{Limit: UsageListMaxLimit + 1, Offset: 0},
+			wantLimit:  UsageListMaxLimit,
+			wantOffset: 0,
+		},
+		{
+			name:       "keep limit inside bounds",
+			filter:     UsageListFilter{Limit: 42, Offset: 7},
+			wantLimit:  42,
+			wantOffset: 7,
+		},
+		{
+			name:       "default offset when negative",
+			filter:     UsageListFilter{Limit: 20, Offset: -10},
+			wantLimit:  20,
+			wantOffset: 0,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotLimit, gotOffset := normalizeUsagePagination(tc.filter)
+			if gotLimit != tc.wantLimit {
+				t.Fatalf("limit mismatch: got %d want %d", gotLimit, tc.wantLimit)
+			}
+			if gotOffset != tc.wantOffset {
+				t.Fatalf("offset mismatch: got %d want %d", gotOffset, tc.wantOffset)
+			}
+		})
+	}
+}
