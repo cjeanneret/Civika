@@ -759,12 +759,13 @@ func buildEmbedder(cfg config.Config) (rag.Embedder, error) {
 func buildSummarizer(cfg config.Config) (rag.Summarizer, error) {
 	if cfg.RAG.Mode == "llm" {
 		return rag.NewLLMSummarizer(rag.LLMSummarizerConfig{
-			Enabled:        cfg.LLM.Enabled,
-			BaseURL:        cfg.LLM.BaseURL,
-			APIKey:         cfg.LLM.APIKey,
-			ModelName:      cfg.LLM.ModelName,
-			Timeout:        cfg.LLM.Timeout,
-			MaxPromptChars: cfg.LLM.MaxPromptChars,
+			Enabled:         cfg.LLM.Enabled,
+			BaseURL:         cfg.LLM.BaseURL,
+			APIKey:          cfg.LLM.APIKey,
+			ModelName:       cfg.LLM.ModelName,
+			Timeout:         cfg.LLM.Timeout,
+			MaxPromptChars:  cfg.LLM.MaxPromptChars,
+			MaxOutputTokens: cfg.LLM.MaxOutputTokens,
 		})
 	}
 	return rag.NewDeterministicSummarizer(), nil
@@ -790,13 +791,14 @@ func buildTranslator(cfg config.Config) (rag.Translator, error) {
 		return rag.NewDisabledTranslator(), nil
 	}
 	translator, err := rag.NewLLMTranslator(rag.LLMTranslatorConfig{
-		Enabled:       cfg.LLM.Enabled,
-		BaseURL:       cfg.LLM.BaseURL,
-		APIKey:        cfg.LLM.APIKey,
-		ModelName:     cfg.LLM.ModelName,
-		Timeout:       cfg.LLM.TranslationTimeout,
-		MaxInputChars: cfg.LLM.MaxPromptChars,
-		MaxRetries:    cfg.LLM.TranslationMaxRetries,
+		Enabled:         cfg.LLM.Enabled,
+		BaseURL:         cfg.LLM.BaseURL,
+		APIKey:          cfg.LLM.APIKey,
+		ModelName:       cfg.LLM.ModelName,
+		Timeout:         cfg.LLM.TranslationTimeout,
+		MaxInputChars:   cfg.LLM.MaxPromptChars,
+		MaxRetries:      cfg.LLM.TranslationMaxRetries,
+		MaxOutputTokens: cfg.LLM.TranslationMaxTokens,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create llm translator: %w", err)

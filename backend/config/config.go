@@ -17,6 +17,7 @@ type Config struct {
 	IdleTimeout  time.Duration
 	BodyMaxBytes int64
 	QARateLimit  QARateLimitConfig
+	QACache      QACacheConfig
 	Debug        DebugConfig
 	LLM          LLMConfig
 	LLMEmbedding LLMEmbeddingConfig
@@ -29,6 +30,24 @@ type QARateLimitConfig struct {
 	Burst           int
 	CleanupInterval time.Duration
 }
+
+type QACacheConfig struct {
+	Enabled                  bool
+	ExactTTL                 time.Duration
+	ExactMaxEntries          int
+	SemanticEnabled          bool
+	SemanticTTL              time.Duration
+	SemanticMaxEntries       int
+	SimilarityThreshold      float64
+	MinSemanticQuestionChars int
+}
+
+const (
+	defaultQACacheExactMaxEntries    = 500
+	defaultQACacheSemanticMaxEntries = 2000
+	maxQACacheExactEntries           = 50_000
+	maxQACacheSemanticEntries        = 100_000
+)
 
 type DebugConfig struct {
 	Enabled bool
@@ -44,6 +63,8 @@ type LLMConfig struct {
 	TranslationTimeout    time.Duration
 	TranslationMaxRetries int
 	MaxPromptChars        int
+	MaxOutputTokens       int
+	TranslationMaxTokens  int
 }
 
 type LLMEmbeddingConfig struct {
@@ -92,6 +113,16 @@ func LoadFromEnv() Config {
 			Burst:           getEnvInt("API_QA_RATE_LIMIT_BURST", 3),
 			CleanupInterval: getEnvDuration("API_QA_RATE_LIMIT_CLEANUP_INTERVAL", time.Minute),
 		},
+		QACache: QACacheConfig{
+			Enabled:                  getEnvBool("QA_CACHE_ENABLED", false),
+			ExactTTL:                 getEnvDuration("QA_CACHE_EXACT_TTL", 10*time.Minute),
+			ExactMaxEntries:          getEnvInt("QA_CACHE_EXACT_MAX_ENTRIES", defaultQACacheExactMaxEntries),
+			SemanticEnabled:          getEnvBool("QA_CACHE_SEMANTIC_ENABLED", false),
+			SemanticTTL:              getEnvDuration("QA_CACHE_SEMANTIC_TTL", 24*time.Hour),
+			SemanticMaxEntries:       getEnvInt("QA_CACHE_SEMANTIC_MAX_ENTRIES", defaultQACacheSemanticMaxEntries),
+			SimilarityThreshold:      getEnvFloat64("QA_CACHE_SEMANTIC_SIMILARITY_THRESHOLD", 0.90),
+			MinSemanticQuestionChars: getEnvInt("QA_CACHE_SEMANTIC_MIN_QUESTION_CHARS", 24),
+		},
 		Debug: DebugConfig{
 			Enabled: getEnvBool("DEBUG_LOG_ENABLED", false),
 			LogPath: getEnv("DEBUG_LOG_PATH", ""),
@@ -105,6 +136,8 @@ func LoadFromEnv() Config {
 			TranslationTimeout:    getEnvDuration("LLM_TRANSLATION_TIMEOUT", getEnvDuration("LLM_TIMEOUT", 10*time.Second)),
 			TranslationMaxRetries: getEnvInt("LLM_TRANSLATION_MAX_RETRIES", 2),
 			MaxPromptChars:        getEnvInt("LLM_MAX_PROMPT_CHARS", 4000),
+			MaxOutputTokens:       getEnvInt("LLM_MAX_OUTPUT_TOKENS_SUMMARIZATION", 220),
+			TranslationMaxTokens:  getEnvInt("LLM_MAX_OUTPUT_TOKENS_TRANSLATION", 800),
 		},
 		LLMEmbedding: LLMEmbeddingConfig{
 			Enabled:       getEnvBool("LLM_EMBEDDING_ENABLED", false),
@@ -139,6 +172,20 @@ func LoadFromEnv() Config {
 	}
 	cfg.RAG.DefaultLanguage = normalizeLanguageWithPreferredFallback(cfg.RAG.DefaultLanguage, cfg.RAG.SupportedLanguages, "fr")
 	cfg.RAG.FallbackLanguage = normalizeLanguageWithPreferredFallback(cfg.RAG.FallbackLanguage, cfg.RAG.SupportedLanguages, "en")
+	if cfg.QACache.ExactTTL <= 0 {
+		cfg.QACache.ExactTTL = 10 * time.Minute
+	}
+	cfg.QACache.ExactMaxEntries = clampInt(cfg.QACache.ExactMaxEntries, 1, maxQACacheExactEntries, defaultQACacheExactMaxEntries)
+	if cfg.QACache.SemanticTTL <= 0 {
+		cfg.QACache.SemanticTTL = 24 * time.Hour
+	}
+	cfg.QACache.SemanticMaxEntries = clampInt(cfg.QACache.SemanticMaxEntries, 1, maxQACacheSemanticEntries, defaultQACacheSemanticMaxEntries)
+	if cfg.QACache.SimilarityThreshold <= 0 || cfg.QACache.SimilarityThreshold > 1 {
+		cfg.QACache.SimilarityThreshold = 0.90
+	}
+	if cfg.QACache.MinSemanticQuestionChars < 1 {
+		cfg.QACache.MinSemanticQuestionChars = 24
+	}
 	return cfg
 }
 
@@ -254,4 +301,17 @@ func normalizeLanguageWithPreferredFallback(raw string, supported []string, pref
 		return supported[0]
 	}
 	return "fr"
+}
+
+func clampInt(value int, minValue int, maxValue int, fallback int) int {
+	if value <= 0 {
+		return fallback
+	}
+	if value < minValue {
+		return minValue
+	}
+	if value > maxValue {
+		return maxValue
+	}
+	return value
 }

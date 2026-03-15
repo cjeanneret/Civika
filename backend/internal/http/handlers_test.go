@@ -120,6 +120,29 @@ type captureLangVotationService struct {
 	lastLang string
 }
 
+type fakeQACacheMetrics struct{}
+
+func (f fakeQACacheMetrics) MetricsSnapshot() services.QACacheMetricsSnapshot {
+	return services.QACacheMetricsSnapshot{
+		Enabled:                   true,
+		SemanticEnabled:           true,
+		ExactEntries:              12,
+		SemanticEntries:           34,
+		ExactHits:                 20,
+		SemanticHits:              15,
+		Misses:                    10,
+		BypassSensitiveQuestion:   3,
+		BypassSemanticDisabled:    0,
+		BypassQuestionTooShort:    2,
+		HitRate:                   0.7778,
+		SemanticHitRate:           0.3333,
+		SemanticScoreMeanOnHit:    0.9123,
+		SavedInputTokensEstimate:  500,
+		SavedOutputTokensEstimate: 300,
+		SavedTotalTokensEstimate:  800,
+	}
+}
+
 func (s *captureLangVotationService) ListVotations(_ context.Context, _ services.VotationFilters) (services.VotationListResult, error) {
 	return services.VotationListResult{Items: []services.VotationListItem{}, Limit: 20, Offset: 0, Total: 0}, nil
 }
@@ -151,6 +174,7 @@ func buildRouterForTest(votationSvc services.VotationService, qaSvc services.Que
 		VotationService: votationSvc,
 		QAService:       qaSvc,
 		UsageMetrics:    fakeUsageMetrics{},
+		QACacheMetrics:  fakeQACacheMetrics{},
 		APIVersion:      "v1",
 		RAGMode:         "local",
 	})
@@ -162,6 +186,19 @@ func buildRouterForMetricsTest(metrics rag.UsageMetricsReader) http.Handler {
 		VotationService: fakeVotationService{},
 		QAService:       fakeQAService{},
 		UsageMetrics:    metrics,
+		QACacheMetrics:  fakeQACacheMetrics{},
+		APIVersion:      "v1",
+		RAGMode:         "local",
+	})
+}
+
+func buildRouterForQACacheMetricsTest(cacheMetrics services.QACacheMetricsReader) http.Handler {
+	cfg := config.LoadFromEnv()
+	return NewRouter(cfg, RouterDependencies{
+		VotationService: fakeVotationService{},
+		QAService:       fakeQAService{},
+		UsageMetrics:    fakeUsageMetrics{},
+		QACacheMetrics:  cacheMetrics,
 		APIVersion:      "v1",
 		RAGMode:         "local",
 	})
@@ -436,5 +473,39 @@ func TestMetricsUsageErrorMessageDoesNotEchoRawDateInput(t *testing.T) {
 	}
 	if strings.Contains(payload.Message, rawInput) {
 		t.Fatalf("error message should not echo raw input, got %q", payload.Message)
+	}
+}
+
+func TestMetricsQACache(t *testing.T) {
+	router := buildRouterForQACacheMetricsTest(fakeQACacheMetrics{})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics/qa-cache", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("expected valid json, got error: %v", err)
+	}
+	if payload["type"] != "qa-cache" {
+		t.Fatalf("expected type qa-cache, got %v", payload["type"])
+	}
+	items, ok := payload["items"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected items object")
+	}
+	if items["savedTotalTokensEstimate"] != float64(800) {
+		t.Fatalf("expected savedTotalTokensEstimate=800, got %v", items["savedTotalTokensEstimate"])
+	}
+}
+
+func TestMetricsQACacheServiceUnavailableWhenDisabled(t *testing.T) {
+	router := buildRouterForQACacheMetricsTest(nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics/qa-cache", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d", rec.Code)
 	}
 }

@@ -232,3 +232,191 @@ func TestLLMTranslatorTranslateFailsAfterRetryExhausted(t *testing.T) {
 		t.Fatalf("expected 2 calls, got %d", atomic.LoadInt32(&callCount))
 	}
 }
+
+func TestLLMTranslatorSendsOutputTokenCap(t *testing.T) {
+	var captured struct {
+		MaxTokens int `json:"max_tokens"`
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{
+				{
+					"message": map[string]any{
+						"content": "Texte traduit",
+					},
+					"finish_reason": "stop",
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	translator, err := NewLLMTranslator(LLMTranslatorConfig{
+		Enabled:         true,
+		BaseURL:         server.URL,
+		ModelName:       "test-model",
+		Timeout:         2 * time.Second,
+		MaxInputChars:   4000,
+		MaxOutputTokens: 123,
+	})
+	if err != nil {
+		t.Fatalf("unexpected constructor error: %v", err)
+	}
+
+	_, err = translator.Translate(context.Background(), TranslationRequest{
+		Text:         "Original",
+		SourceLang:   "de",
+		TargetLang:   "fr",
+		ContentLabel: "document content",
+	})
+	if err != nil {
+		t.Fatalf("unexpected translate error: %v", err)
+	}
+	if captured.MaxTokens != 123 {
+		t.Fatalf("expected max_tokens=123, got %d", captured.MaxTokens)
+	}
+}
+
+func TestLLMTranslatorExtractsStructuredMessageContent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{
+				{
+					"message": map[string]any{
+						"content": []map[string]any{
+							{"type": "text", "text": "Texte"},
+							{"type": "text", "text": "traduit"},
+						},
+					},
+					"finish_reason": "stop",
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	translator, err := NewLLMTranslator(LLMTranslatorConfig{
+		Enabled:       true,
+		BaseURL:       server.URL,
+		ModelName:     "test-model",
+		Timeout:       2 * time.Second,
+		MaxInputChars: 4000,
+		MaxRetries:    0,
+	})
+	if err != nil {
+		t.Fatalf("unexpected constructor error: %v", err)
+	}
+
+	got, err := translator.Translate(context.Background(), TranslationRequest{
+		Text:         "Original",
+		SourceLang:   "de",
+		TargetLang:   "fr",
+		ContentLabel: "document content",
+	})
+	if err != nil {
+		t.Fatalf("unexpected translate error: %v", err)
+	}
+	if got != "Texte\ntraduit" {
+		t.Fatalf("unexpected translation: %q", got)
+	}
+}
+
+func TestLLMTranslatorFallsBackToReasoningContent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{
+				{
+					"message": map[string]any{
+						"content":           "",
+						"reasoning_content": "Texte traduit depuis reasoning_content",
+					},
+					"finish_reason": "length",
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	translator, err := NewLLMTranslator(LLMTranslatorConfig{
+		Enabled:       true,
+		BaseURL:       server.URL,
+		ModelName:     "test-model",
+		Timeout:       2 * time.Second,
+		MaxInputChars: 4000,
+		MaxRetries:    0,
+	})
+	if err != nil {
+		t.Fatalf("unexpected constructor error: %v", err)
+	}
+
+	got, err := translator.Translate(context.Background(), TranslationRequest{
+		Text:         "Original",
+		SourceLang:   "de",
+		TargetLang:   "fr",
+		ContentLabel: "document content",
+	})
+	if err != nil {
+		t.Fatalf("unexpected translate error: %v", err)
+	}
+	if got != "Texte traduit depuis reasoning_content" {
+		t.Fatalf("unexpected translation: %q", got)
+	}
+}
+
+func TestLLMTranslatorFallsBackToReasoningField(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{
+				{
+					"message": map[string]any{
+						"content":   "",
+						"reasoning": "Texte traduit depuis reasoning",
+					},
+					"finish_reason": "length",
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	translator, err := NewLLMTranslator(LLMTranslatorConfig{
+		Enabled:       true,
+		BaseURL:       server.URL,
+		ModelName:     "test-model",
+		Timeout:       2 * time.Second,
+		MaxInputChars: 4000,
+		MaxRetries:    0,
+	})
+	if err != nil {
+		t.Fatalf("unexpected constructor error: %v", err)
+	}
+
+	got, err := translator.Translate(context.Background(), TranslationRequest{
+		Text:         "Original",
+		SourceLang:   "de",
+		TargetLang:   "fr",
+		ContentLabel: "document content",
+	})
+	if err != nil {
+		t.Fatalf("unexpected translate error: %v", err)
+	}
+	if got != "Texte traduit depuis reasoning" {
+		t.Fatalf("unexpected translation: %q", got)
+	}
+}

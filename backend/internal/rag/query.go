@@ -70,12 +70,13 @@ type Summarizer interface {
 }
 
 type LLMSummarizerConfig struct {
-	Enabled        bool
-	BaseURL        string
-	APIKey         string
-	ModelName      string
-	Timeout        time.Duration
-	MaxPromptChars int
+	Enabled         bool
+	BaseURL         string
+	APIKey          string
+	ModelName       string
+	Timeout         time.Duration
+	MaxPromptChars  int
+	MaxOutputTokens int
 }
 
 type LLMSummarizer struct {
@@ -95,6 +96,9 @@ func NewLLMSummarizer(cfg LLMSummarizerConfig) (*LLMSummarizer, error) {
 	}
 	if cfg.MaxPromptChars <= 0 {
 		cfg.MaxPromptChars = 4000
+	}
+	if cfg.MaxOutputTokens <= 0 {
+		cfg.MaxOutputTokens = 220
 	}
 	return &LLMSummarizer{
 		cfg: cfg,
@@ -116,13 +120,14 @@ func (s *LLMSummarizer) Summarize(ctx context.Context, question string, hits []S
 		return "", errors.New("hits are required")
 	}
 
-	prompt := buildSummaryPrompt(question, hits)
+	prompt := buildSummaryPrompt(question, hits, s.cfg.MaxPromptChars)
 	if len(prompt) > s.cfg.MaxPromptChars {
 		prompt = prompt[:s.cfg.MaxPromptChars]
 	}
 
 	payload := map[string]any{
-		"model": s.cfg.ModelName,
+		"model":      s.cfg.ModelName,
+		"max_tokens": s.cfg.MaxOutputTokens,
 		"messages": []map[string]string{
 			{
 				"role":    "system",
@@ -331,17 +336,22 @@ func ExplainVotation(ctx context.Context, summarizer Summarizer, question string
 	return summarizer.Summarize(ctx, question, hits)
 }
 
-func buildSummaryPrompt(question string, hits []SearchHit) string {
+func buildSummaryPrompt(question string, hits []SearchHit, maxPromptChars int) string {
 	var b strings.Builder
-	b.WriteString("Question utilisateur:\n")
+	b.WriteString("Question utilisateur (sanitisee):\n")
 	b.WriteString(question)
 	b.WriteString("\n\nExtraits de documents publics indexes:\n")
+	remainingBudget := maxPromptChars - len(b.String()) - 220
+	if remainingBudget < 800 {
+		remainingBudget = 800
+	}
+	usedBudget := 0
 	for i, hit := range hits {
 		if i >= 8 {
 			break
 		}
 		intervenants := formatIntervenants(hit.Chunk.Intervenants)
-		b.WriteString(fmt.Sprintf(
+		header := fmt.Sprintf(
 			"\n[%d] source=%s title=%s lang=%s score=%.4f source_uri=%s intervenants=%s\n",
 			i+1,
 			hit.Chunk.SourcePath,
@@ -350,11 +360,25 @@ func buildSummaryPrompt(question string, hits []SearchHit) string {
 			hit.Score,
 			hit.Chunk.Source.SourceURI,
 			intervenants,
-		))
-		b.WriteString(hit.Chunk.Text)
+		)
+		b.WriteString(header)
+		usedBudget += len(header)
+		if usedBudget >= remainingBudget {
+			break
+		}
+		chunkText := hit.Chunk.Text
+		available := remainingBudget - usedBudget
+		if available <= 0 {
+			break
+		}
+		if len(chunkText) > available {
+			chunkText = chunkText[:available]
+		}
+		b.WriteString(chunkText)
+		usedBudget += len(chunkText)
 		b.WriteString("\n")
 	}
-	b.WriteString("\nProduis un resume factuel et concis en francais, uniquement base sur ces sources.")
+	b.WriteString("\nProduis un resume factuel en francais en 1 ou 2 phrases maximum, uniquement base sur ces sources.")
 	return b.String()
 }
 

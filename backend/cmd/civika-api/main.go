@@ -71,7 +71,8 @@ func main() {
 		DefaultLanguage:    cfg.RAG.DefaultLanguage,
 		FallbackLanguage:   cfg.RAG.FallbackLanguage,
 	})
-	qaService := services.NewQAService(store, embedder, summarizer, cfg.RAG.TopK, store, cfg.RAG.Mode)
+	qaCache := services.NewQACache(cfg.QACache)
+	qaService := services.NewQAService(store, embedder, summarizer, cfg.RAG.TopK, store, cfg.RAG.Mode, qaCache)
 
 	srv := &http.Server{
 		Addr: cfg.APIAddress(),
@@ -79,6 +80,7 @@ func main() {
 			VotationService: votationService,
 			QAService:       qaService,
 			UsageMetrics:    store,
+			QACacheMetrics:  qaCache,
 			APIVersion:      "v1",
 			RAGMode:         cfg.RAG.Mode,
 		}),
@@ -129,12 +131,13 @@ func buildRAGRuntime(cfg config.Config) (rag.Embedder, rag.Summarizer, error) {
 			return nil, nil, fmt.Errorf("create llm embedder: %w", err)
 		}
 		summarizer, err := rag.NewLLMSummarizer(rag.LLMSummarizerConfig{
-			Enabled:        cfg.LLM.Enabled,
-			BaseURL:        cfg.LLM.BaseURL,
-			APIKey:         cfg.LLM.APIKey,
-			ModelName:      cfg.LLM.ModelName,
-			Timeout:        cfg.LLM.Timeout,
-			MaxPromptChars: cfg.LLM.MaxPromptChars,
+			Enabled:         cfg.LLM.Enabled,
+			BaseURL:         cfg.LLM.BaseURL,
+			APIKey:          cfg.LLM.APIKey,
+			ModelName:       cfg.LLM.ModelName,
+			Timeout:         cfg.LLM.Timeout,
+			MaxPromptChars:  cfg.LLM.MaxPromptChars,
+			MaxOutputTokens: cfg.LLM.MaxOutputTokens,
 		})
 		if err != nil {
 			return nil, nil, fmt.Errorf("create llm summarizer: %w", err)
@@ -150,12 +153,14 @@ func buildTranslatorRuntime(cfg config.Config) (rag.Translator, error) {
 		return nil, nil
 	}
 	translator, err := rag.NewLLMTranslator(rag.LLMTranslatorConfig{
-		Enabled:       cfg.LLM.Enabled,
-		BaseURL:       cfg.LLM.BaseURL,
-		APIKey:        cfg.LLM.APIKey,
-		ModelName:     cfg.LLM.ModelName,
-		Timeout:       cfg.LLM.TranslationTimeout,
-		MaxInputChars: cfg.LLM.MaxPromptChars,
+		Enabled:         cfg.LLM.Enabled,
+		BaseURL:         cfg.LLM.BaseURL,
+		APIKey:          cfg.LLM.APIKey,
+		ModelName:       cfg.LLM.ModelName,
+		Timeout:         cfg.LLM.TranslationTimeout,
+		MaxInputChars:   cfg.LLM.MaxPromptChars,
+		MaxRetries:      cfg.LLM.TranslationMaxRetries,
+		MaxOutputTokens: cfg.LLM.TranslationMaxTokens,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create llm translator: %w", err)

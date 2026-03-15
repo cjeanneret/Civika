@@ -15,9 +15,36 @@
   - `LLM_ENABLED`
   - `LLM_BASE_URL`
   - `LLM_MODEL_NAME`
+  - `LLM_MAX_PROMPT_CHARS`
+  - `LLM_MAX_OUTPUT_TOKENS_SUMMARIZATION`
+  - `LLM_MAX_OUTPUT_TOKENS_TRANSLATION`
+  - `LLM_TRANSLATION_MAX_RETRIES`
   - `LLM_EMBEDDING_ENABLED`
   - `LLM_EMBEDDING_BASE_URL`
   - `LLM_EMBEDDING_MODEL_NAME`
+- Cache QA (reduction usage LLM):
+  - `QA_CACHE_ENABLED`
+  - `QA_CACHE_EXACT_TTL`
+  - `QA_CACHE_EXACT_MAX_ENTRIES`
+  - `QA_CACHE_SEMANTIC_ENABLED`
+  - `QA_CACHE_SEMANTIC_TTL`
+  - `QA_CACHE_SEMANTIC_MAX_ENTRIES`
+  - `QA_CACHE_SEMANTIC_SIMILARITY_THRESHOLD`
+  - `QA_CACHE_SEMANTIC_MIN_QUESTION_CHARS`
+
+## Reduction tokens (quick wins)
+- Resume QA contraint a une sortie courte (1 a 2 phrases) cote prompt.
+- Cap explicite des tokens de sortie pour:
+  - summarization (`LLM_MAX_OUTPUT_TOKENS_SUMMARIZATION`),
+  - traduction (`LLM_MAX_OUTPUT_TOKENS_TRANSLATION`).
+- Les retries de traduction sont controles par `LLM_TRANSLATION_MAX_RETRIES`.
+- Les logs techniques n'exposent pas de preview brute de reponse LLM.
+
+## Caching QA (phase 2)
+- Le cache exact (L1) et semantique (L2) est configurable via `QA_CACHE_*`.
+- Le cache semantique reutilise les questions sanitisees pour retrouver des requetes proches.
+- Aucune metadonnee personnelle n'est stockee (pas d'IP, pas d'identifiant utilisateur).
+- En cas de doute (score faible ou contexte incompatible), le cache est ignore et la requete suit le chemin LLM normal.
 
 ## Indexation et requête
 - Indexer le corpus:
