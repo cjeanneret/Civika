@@ -232,3 +232,51 @@ func TestLLMTranslatorTranslateFailsAfterRetryExhausted(t *testing.T) {
 		t.Fatalf("expected 2 calls, got %d", atomic.LoadInt32(&callCount))
 	}
 }
+
+func TestLLMTranslatorSendsOutputTokenCap(t *testing.T) {
+	var captured struct {
+		MaxTokens int `json:"max_tokens"`
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{
+				{
+					"message": map[string]any{
+						"content": "Texte traduit",
+					},
+					"finish_reason": "stop",
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	translator, err := NewLLMTranslator(LLMTranslatorConfig{
+		Enabled:         true,
+		BaseURL:         server.URL,
+		ModelName:       "test-model",
+		Timeout:         2 * time.Second,
+		MaxInputChars:   4000,
+		MaxOutputTokens: 123,
+	})
+	if err != nil {
+		t.Fatalf("unexpected constructor error: %v", err)
+	}
+
+	_, err = translator.Translate(context.Background(), TranslationRequest{
+		Text:         "Original",
+		SourceLang:   "de",
+		TargetLang:   "fr",
+		ContentLabel: "document content",
+	})
+	if err != nil {
+		t.Fatalf("unexpected translate error: %v", err)
+	}
+	if captured.MaxTokens != 123 {
+		t.Fatalf("expected max_tokens=123, got %d", captured.MaxTokens)
+	}
+}

@@ -2,7 +2,12 @@ package rag
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 )
 
 type fakeStore struct {
@@ -66,5 +71,80 @@ func TestExplainVotationDeterministic(t *testing.T) {
 	}
 	if summary == "" {
 		t.Fatal("expected non-empty summary")
+	}
+}
+
+func TestLLMSummarizerSendsOutputTokenCapAndShortResponseInstruction(t *testing.T) {
+	var captured struct {
+		MaxTokens int `json:"max_tokens"`
+		Messages  []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"messages"`
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("expected POST, got %s", r.Method)
+		}
+		if !strings.HasSuffix(r.URL.Path, "/v1/chat/completions") {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{
+				{
+					"message": map[string]any{
+						"content": "Resume court.",
+					},
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	summarizer, err := NewLLMSummarizer(LLMSummarizerConfig{
+		Enabled:         true,
+		BaseURL:         server.URL,
+		ModelName:       "test-model",
+		Timeout:         2 * time.Second,
+		MaxPromptChars:  1200,
+		MaxOutputTokens: 77,
+	})
+	if err != nil {
+		t.Fatalf("constructor error: %v", err)
+	}
+
+	_, err = summarizer.Summarize(context.Background(), "Quels sont les impacts?", []SearchHit{
+		{
+			Chunk: Chunk{
+				SourcePath: "src.md",
+				Title:      "Source",
+				Text:       strings.Repeat("texte ", 200),
+				Source: SourceMetadata{
+					SourceURI: "https://example.test/source",
+				},
+			},
+			Score: 0.91,
+		},
+	})
+	if err != nil {
+		t.Fatalf("summarize error: %v", err)
+	}
+
+	if captured.MaxTokens != 77 {
+		t.Fatalf("expected max_tokens=77, got %d", captured.MaxTokens)
+	}
+	if len(captured.Messages) < 2 {
+		t.Fatalf("expected at least 2 messages, got %d", len(captured.Messages))
+	}
+	userPrompt := captured.Messages[1].Content
+	if !strings.Contains(userPrompt, "1 ou 2 phrases maximum") {
+		t.Fatalf("expected short-response instruction in prompt, got: %q", userPrompt)
+	}
+	if len(userPrompt) > 1200 {
+		t.Fatalf("expected prompt <= 1200 chars, got %d", len(userPrompt))
 	}
 }

@@ -50,13 +50,14 @@ func (t *DisabledTranslator) Translate(_ context.Context, _ TranslationRequest) 
 }
 
 type LLMTranslatorConfig struct {
-	Enabled       bool
-	BaseURL       string
-	APIKey        string
-	ModelName     string
-	Timeout       time.Duration
-	MaxInputChars int
-	MaxRetries    int
+	Enabled         bool
+	BaseURL         string
+	APIKey          string
+	ModelName       string
+	Timeout         time.Duration
+	MaxInputChars   int
+	MaxRetries      int
+	MaxOutputTokens int
 }
 
 type LLMTranslator struct {
@@ -79,6 +80,9 @@ func NewLLMTranslator(cfg LLMTranslatorConfig) (*LLMTranslator, error) {
 	}
 	if cfg.MaxRetries < 0 {
 		cfg.MaxRetries = 0
+	}
+	if cfg.MaxOutputTokens <= 0 {
+		cfg.MaxOutputTokens = 800
 	}
 	return &LLMTranslator{
 		cfg: cfg,
@@ -174,7 +178,8 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 	// #endregion
 	prompt := buildTranslationPrompt(text, sourceLang, targetLang, request.ContentLabel)
 	payload := map[string]any{
-		"model": t.cfg.ModelName,
+		"model":      t.cfg.ModelName,
+		"max_tokens": t.cfg.MaxOutputTokens,
 		"messages": []map[string]string{
 			{
 				"role":    "system",
@@ -358,10 +363,6 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 		translated = strings.TrimSpace(response.Choices[0].Text)
 	}
 	if translated == "" {
-		responsePreview := string(responseBody)
-		if len(responsePreview) > 280 {
-			responsePreview = responsePreview[:280]
-		}
 		// #region agent log
 		writeDebugNDJSONLog(ctx, "H3", "backend/internal/rag/translate.go:246", "translation_http_response_empty_text", map[string]any{
 			"source_lang":                sourceLang,
@@ -370,7 +371,6 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 			"duration_ms":                time.Since(requestStarted).Milliseconds(),
 			"choices_count":              len(response.Choices),
 			"first_choice_finish_reason": firstChoiceFinishReason,
-			"response_preview":           responsePreview,
 		})
 		// #endregion
 		emitUsageEvent(ctx, UsageEvent{

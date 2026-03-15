@@ -49,3 +49,20 @@ func TestLoadFromEnvQARateLimitOverrides(t *testing.T) {
 		t.Fatalf("expected CleanupInterval 30s, got %s", cfg.QARateLimit.CleanupInterval)
 	}
 }
+
+func TestLoadFromEnvLLMOutputTokenOverrides(t *testing.T) {
+	t.Setenv("LLM_MAX_OUTPUT_TOKENS_SUMMARIZATION", "180")
+	t.Setenv("LLM_MAX_OUTPUT_TOKENS_TRANSLATION", "620")
+	t.Setenv("LLM_TRANSLATION_MAX_RETRIES", "4")
+
+	cfg := LoadFromEnv()
+	if cfg.LLM.MaxOutputTokens != 180 {
+		t.Fatalf("expected summary output cap 180, got %d", cfg.LLM.MaxOutputTokens)
+	}
+	if cfg.LLM.TranslationMaxTokens != 620 {
+		t.Fatalf("expected translation output cap 620, got %d", cfg.LLM.TranslationMaxTokens)
+	}
+	if cfg.LLM.TranslationMaxRetries != 4 {
+		t.Fatalf("expected translation retries 4, got %d", cfg.LLM.TranslationMaxRetries)
+	}
+}
