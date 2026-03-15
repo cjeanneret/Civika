@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"civika/backend/internal/debuglog"
 	"civika/backend/internal/langs"
 )
 
@@ -111,29 +110,8 @@ func (t *LLMTranslator) Translate(ctx context.Context, request TranslationReques
 			return "", err
 		}
 		if attempt == t.cfg.MaxRetries {
-			// #region agent log
-			writeDebugNDJSONLog(ctx, "H6", "backend/internal/rag/translate.go:112", "translation_retry_exhausted", map[string]any{
-				"source_lang":   langs.Normalize(request.SourceLang),
-				"target_lang":   langs.Normalize(request.TargetLang),
-				"content_label": request.ContentLabel,
-				"attempt":       attempt + 1,
-				"max_retries":   t.cfg.MaxRetries,
-				"error":         err.Error(),
-			})
-			// #endregion
 			return "", err
 		}
-		// #region agent log
-		writeDebugNDJSONLog(ctx, "H6", "backend/internal/rag/translate.go:126", "translation_retry_scheduled", map[string]any{
-			"source_lang":   langs.Normalize(request.SourceLang),
-			"target_lang":   langs.Normalize(request.TargetLang),
-			"content_label": request.ContentLabel,
-			"attempt":       attempt + 1,
-			"next_attempt":  attempt + 2,
-			"max_retries":   t.cfg.MaxRetries,
-			"error":         err.Error(),
-		})
-		// #endregion
 	}
 	if lastErr == nil {
 		lastErr = errors.New("translation failed without explicit error")
@@ -157,25 +135,6 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 	if len(text) > t.cfg.MaxInputChars {
 		text = text[:t.cfg.MaxInputChars]
 	}
-	deadline, hasDeadline := ctx.Deadline()
-	ctxRemainingMs := int64(-1)
-	if hasDeadline {
-		ctxRemainingMs = time.Until(deadline).Milliseconds()
-	}
-	// #region agent log
-	writeDebugNDJSONLog(ctx, "H2", "backend/internal/rag/translate.go:118", "translation_http_request_start", map[string]any{
-		"source_lang":      sourceLang,
-		"target_lang":      targetLang,
-		"content_label":    request.ContentLabel,
-		"text_len":         len(text),
-		"max_input_chars":  t.cfg.MaxInputChars,
-		"client_timeoutMs": t.cfg.Timeout.Milliseconds(),
-		"ctx_has_deadline": hasDeadline,
-		"ctx_remaining_ms": ctxRemainingMs,
-		"base_url":         t.cfg.BaseURL,
-		"model_name":       t.cfg.ModelName,
-	})
-	// #endregion
 	prompt := buildTranslationPrompt(text, sourceLang, targetLang, request.ContentLabel)
 	payload := map[string]any{
 		"model":      t.cfg.ModelName,
@@ -208,17 +167,6 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 	requestStarted := time.Now()
 	res, err := t.client.Do(req)
 	if err != nil {
-		// #region agent log
-		writeDebugNDJSONLog(ctx, "H2", "backend/internal/rag/translate.go:148", "translation_http_request_error", map[string]any{
-			"source_lang":      sourceLang,
-			"target_lang":      targetLang,
-			"content_label":    request.ContentLabel,
-			"duration_ms":      time.Since(requestStarted).Milliseconds(),
-			"error":            err.Error(),
-			"ctx_err":          contextErrorString(ctx),
-			"client_timeoutMs": t.cfg.Timeout.Milliseconds(),
-		})
-		// #endregion
 		emitUsageEvent(ctx, UsageEvent{
 			Operation:    "translation",
 			ProviderName: "llm",
@@ -236,15 +184,6 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		// #region agent log
-		writeDebugNDJSONLog(ctx, "H4", "backend/internal/rag/translate.go:166", "translation_http_bad_status", map[string]any{
-			"source_lang":   sourceLang,
-			"target_lang":   targetLang,
-			"content_label": request.ContentLabel,
-			"duration_ms":   time.Since(requestStarted).Milliseconds(),
-			"status_code":   res.StatusCode,
-		})
-		// #endregion
 		emitUsageEvent(ctx, UsageEvent{
 			Operation:    "translation",
 			ProviderName: "llm",
@@ -282,16 +221,8 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 	if usageErr != nil {
 		usage = UsageEvent{UsageSource: "unknown"}
 	}
-	var response struct {
-		Choices []struct {
-			FinishReason string `json:"finish_reason"`
-			Message      struct {
-				Content string `json:"content"`
-			} `json:"message"`
-			Text string `json:"text"`
-		} `json:"choices"`
-	}
-	if err := json.Unmarshal(responseBody, &response); err != nil {
+	var responseEnvelope map[string]any
+	if err := json.Unmarshal(responseBody, &responseEnvelope); err != nil {
 		emitUsageEvent(ctx, UsageEvent{
 			Operation:    "translation",
 			ProviderName: "llm",
@@ -310,36 +241,8 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 		})
 		return "", false, fmt.Errorf("decode translation response: %w", err)
 	}
-	firstChoiceMessageLen := 0
-	firstChoiceTextLen := 0
-	firstChoiceFinishReason := ""
-	if len(response.Choices) > 0 {
-		firstChoiceMessageLen = len(strings.TrimSpace(response.Choices[0].Message.Content))
-		firstChoiceTextLen = len(strings.TrimSpace(response.Choices[0].Text))
-		firstChoiceFinishReason = strings.TrimSpace(response.Choices[0].FinishReason)
-	}
-	// #region agent log
-	writeDebugNDJSONLog(ctx, "H3", "backend/internal/rag/translate.go:214", "translation_http_response_shape", map[string]any{
-		"source_lang":                sourceLang,
-		"target_lang":                targetLang,
-		"content_label":              request.ContentLabel,
-		"duration_ms":                time.Since(requestStarted).Milliseconds(),
-		"response_bytes":             len(responseBody),
-		"choices_count":              len(response.Choices),
-		"first_choice_message_len":   firstChoiceMessageLen,
-		"first_choice_text_len":      firstChoiceTextLen,
-		"first_choice_finish_reason": firstChoiceFinishReason,
-	})
-	// #endregion
-	if len(response.Choices) == 0 {
-		// #region agent log
-		writeDebugNDJSONLog(ctx, "H3", "backend/internal/rag/translate.go:227", "translation_http_response_no_choices", map[string]any{
-			"source_lang":   sourceLang,
-			"target_lang":   targetLang,
-			"content_label": request.ContentLabel,
-			"duration_ms":   time.Since(requestStarted).Milliseconds(),
-		})
-		// #endregion
+	choicesRaw, ok := responseEnvelope["choices"].([]any)
+	if !ok || len(choicesRaw) == 0 {
 		emitUsageEvent(ctx, UsageEvent{
 			Operation:    "translation",
 			ProviderName: "llm",
@@ -358,21 +261,28 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 		})
 		return "", true, errors.New("translation response has no choices")
 	}
-	translated := strings.TrimSpace(response.Choices[0].Message.Content)
-	if translated == "" {
-		translated = strings.TrimSpace(response.Choices[0].Text)
-	}
-	if translated == "" {
-		// #region agent log
-		writeDebugNDJSONLog(ctx, "H3", "backend/internal/rag/translate.go:246", "translation_http_response_empty_text", map[string]any{
-			"source_lang":                sourceLang,
-			"target_lang":                targetLang,
-			"content_label":              request.ContentLabel,
-			"duration_ms":                time.Since(requestStarted).Milliseconds(),
-			"choices_count":              len(response.Choices),
-			"first_choice_finish_reason": firstChoiceFinishReason,
+	firstChoice, ok := choicesRaw[0].(map[string]any)
+	if !ok {
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "translation",
+			ProviderName: "llm",
+			ModelName:    t.cfg.ModelName,
+			SourceLang:   sourceLang,
+			TargetLang:   targetLang,
+			InputChars:   len(text),
+			OutputChars:  0,
+			InputTokens:  usage.InputTokens,
+			OutputTokens: usage.OutputTokens,
+			TotalTokens:  usage.TotalTokens,
+			UsageSource:  usage.UsageSource,
+			Status:       "error",
+			DurationMS:   time.Since(requestStarted).Milliseconds(),
+			ErrorCode:    "no_choices",
 		})
-		// #endregion
+		return "", true, errors.New("translation response has no choices")
+	}
+	translated := extractOpenAIChoiceText(firstChoice)
+	if translated == "" {
 		emitUsageEvent(ctx, UsageEvent{
 			Operation:    "translation",
 			ProviderName: "llm",
@@ -391,15 +301,6 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 		})
 		return "", true, errors.New("translation response is empty")
 	}
-	// #region agent log
-	writeDebugNDJSONLog(ctx, "H5", "backend/internal/rag/translate.go:203", "translation_http_request_success", map[string]any{
-		"source_lang":   sourceLang,
-		"target_lang":   targetLang,
-		"content_label": request.ContentLabel,
-		"duration_ms":   time.Since(requestStarted).Milliseconds(),
-		"output_len":    len(translated),
-	})
-	// #endregion
 	emitUsageEvent(ctx, UsageEvent{
 		Operation:    "translation",
 		ProviderName: "llm",
@@ -416,6 +317,62 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 		DurationMS:   time.Since(requestStarted).Milliseconds(),
 	})
 	return translated, false, nil
+}
+
+func extractOpenAIChoiceText(choice map[string]any) string {
+	messageRaw, hasMessage := choice["message"]
+	if hasMessage {
+		if messageMap, ok := messageRaw.(map[string]any); ok {
+			translated := extractMessageContentText(messageMap["content"])
+			if translated != "" {
+				return translated
+			}
+			reasoningContent := strings.TrimSpace(anyToString(messageMap["reasoning_content"]))
+			if reasoningContent != "" {
+				return reasoningContent
+			}
+			reasoning := strings.TrimSpace(anyToString(messageMap["reasoning"]))
+			if reasoning != "" {
+				return reasoning
+			}
+		}
+	}
+	translated := strings.TrimSpace(anyToString(choice["text"]))
+	return translated
+}
+
+func extractMessageContentText(content any) string {
+	switch v := content.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case []any:
+		var b strings.Builder
+		for _, part := range v {
+			switch p := part.(type) {
+			case string:
+				segment := strings.TrimSpace(p)
+				if segment == "" {
+					continue
+				}
+				if b.Len() > 0 {
+					b.WriteString("\n")
+				}
+				b.WriteString(segment)
+			case map[string]any:
+				segment := strings.TrimSpace(anyToString(p["text"]))
+				if segment == "" {
+					continue
+				}
+				if b.Len() > 0 {
+					b.WriteString("\n")
+				}
+				b.WriteString(segment)
+			}
+		}
+		return strings.TrimSpace(b.String())
+	default:
+		return ""
+	}
 }
 
 func buildTranslationPrompt(text, sourceLang, targetLang, contentLabel string) string {
@@ -466,18 +423,6 @@ func EnsureMissingTranslationsWithOptions(
 	for _, doc := range documents {
 		grouped[doc.ID] = append(grouped[doc.ID], doc)
 	}
-	// #region agent log
-	writeDebugNDJSONLog(ctx, "H1", "backend/internal/rag/translate.go:248", "ensure_missing_translations_start", map[string]any{
-		"documents_total":        len(documents),
-		"documents_grouped":      len(grouped),
-		"supported_languages":    supportedLanguages,
-		"supported_count":        len(supportedLanguages),
-		"default_lang":           defaultLang,
-		"translator":             translator.Name(),
-		"ctx_has_deadline":       hasContextDeadline(ctx),
-		"ctx_remaining_at_start": contextRemainingMs(ctx),
-	})
-	// #endregion
 
 	out := make([]Document, 0, len(documents))
 	for _, docs := range grouped {
@@ -513,17 +458,6 @@ func EnsureMissingTranslationsWithOptions(
 			}
 			translated, err := translateDocument(ctx, sourceDoc, langCode, translator)
 			if err != nil {
-				// #region agent log
-				writeDebugNDJSONLog(ctx, "H1", "backend/internal/rag/translate.go:283", "ensure_missing_translations_failed", map[string]any{
-					"document_id":       sourceDoc.ID,
-					"source_lang":       sourceDoc.Language,
-					"target_lang":       langCode,
-					"error":             err.Error(),
-					"ctx_err":           contextErrorString(ctx),
-					"ctx_remaining_ms":  contextRemainingMs(ctx),
-					"translations_done": len(out),
-				})
-				// #endregion
 				return nil, fmt.Errorf("translate %s to %s: %w", sourceDoc.ID, langCode, err)
 			}
 			out = append(out, withIndexMetadata(translated))
@@ -573,30 +507,6 @@ func reuseExistingReadyTranslation(sourceDoc Document, targetLang string, state 
 		Metadata:      sanitizeMetadataMap(metadata),
 	}
 	return withIndexMetadata(reused), true
-}
-
-func hasContextDeadline(ctx context.Context) bool {
-	_, ok := ctx.Deadline()
-	return ok
-}
-
-func contextRemainingMs(ctx context.Context) int64 {
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		return -1
-	}
-	return time.Until(deadline).Milliseconds()
-}
-
-func contextErrorString(ctx context.Context) string {
-	if err := ctx.Err(); err != nil {
-		return err.Error()
-	}
-	return ""
-}
-
-func writeDebugNDJSONLog(ctx context.Context, hypothesisID, location, message string, data map[string]any) {
-	debuglog.Log(ctx, hypothesisID, location, message, data)
 }
 
 func pickSourceDocument(byLang map[string]Document, supported []string) (Document, bool) {
@@ -774,4 +684,15 @@ func mergeTranslateTaskFields(base map[string]any, additional map[string]any) ma
 		out[key] = value
 	}
 	return out
+}
+
+func anyToString(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case nil:
+		return ""
+	default:
+		return fmt.Sprint(v)
+	}
 }
