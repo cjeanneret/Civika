@@ -44,10 +44,15 @@
 ## Indexation et requête
 - Indexer le corpus:
   - `cd backend && go run ./cmd/rag-cli index`
+  - `cd backend && go run ./cmd/rag-cli index --workers 4`
   - ou `make rag-index`
 - Interroger:
   - `cd backend && go run ./cmd/rag-cli query --q "Quel est l'impact principal de la votation ?"`
   - ou `make rag-query Q="Quel est l'impact principal de la votation ?"`
+- Pipeline d'indexation:
+  - Le traitement est fait par document: traduction (si mode `llm`) -> chunking -> embeddings -> insertion.
+  - Un document termine devient visible en base sans attendre la fin complete du lot.
+  - `--workers` permet une parallelisation controlee (borne a 1..8, defaut `1`).
 
 ## Métriques de tokens (sans coût)
 - Les appels IA persistés sont stockés dans :

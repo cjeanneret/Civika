@@ -35,6 +35,7 @@ Le projet combine une API backend en Go, un frontend TypeScript et une chaîne R
 ## Principes sécurité et privacy
 - Sélection de mode RAG explicite (`RAG_MODE=local|llm`), sans fallback silencieux.
 - Réindexation obligatoire après changement de modèle ou de dimensions d'embedding.
+- Indexation progressive par document (traduction/chunk/embed/upsert) pour une disponibilite plus rapide des donnees.
 - Aucun secret dans le code; configuration sensible via variables d'environnement.
 - Aucun stockage de données personnelles utilisateur côté backend.
 

@@ -58,8 +58,12 @@ func runIndex(cfg config.Config, args []string) error {
 	maxFileBytes := fs.Int64("max-file-bytes", 2*1024*1024, "max file size in bytes")
 	chunkSize := fs.Int("chunk-size", cfg.RAG.ChunkSizeTokens, "chunk size in tokens")
 	overlap := fs.Float64("chunk-overlap", cfg.RAG.ChunkOverlapRatio, "chunk overlap ratio")
+	workers := fs.Int("workers", 1, "number of indexing workers (1-8)")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *workers < 1 || *workers > 8 {
+		return fmt.Errorf("workers must be between %d and %d", 1, 8)
 	}
 	selectedCorpus := *corpusPath
 	if selectedCorpus == "" {
@@ -145,41 +149,13 @@ func runIndex(cfg config.Config, args []string) error {
 		return nil
 	}
 
+	var translator rag.Translator
 	if cfg.RAG.Mode == "llm" {
-		translator, err := buildTranslator(cfg)
+		translator, err = buildTranslator(cfg)
 		if err != nil {
 			indexTask.Fail(err, map[string]any{"phase": "build_translator"})
 			return err
 		}
-		translationTask := startIndexTask("ensure_translations", map[string]any{
-			"provider":     translator.Name(),
-			"documents":    len(documentsToProcess),
-			"skipped_docs": skipReport.SkippedDocuments,
-			"grouped_docs": skipReport.GroupedDocuments,
-		})
-		err = runWithHeartbeat(ctx, 30*time.Second, "rag-cli: traduction en cours... (toujours actif)", func() error {
-			var translationErr error
-			documentsToProcess, translationErr = rag.EnsureMissingTranslationsWithOptions(
-				ctx,
-				documentsToProcess,
-				cfg.RAG.SupportedLanguages,
-				cfg.RAG.DefaultLanguage,
-				translator,
-				rag.EnsureMissingTranslationsOptions{
-					ExistingByDocument: existingState,
-				},
-			)
-			return translationErr
-		})
-		if err != nil {
-			translationTask.Fail(err, nil)
-			indexTask.Fail(err, map[string]any{"phase": "ensure_translations"})
-			return fmt.Errorf("ensure translations: %w", err)
-		}
-		translationTask.Done(map[string]any{
-			"documents":           len(documentsToProcess),
-			"supported_languages": len(cfg.RAG.SupportedLanguages),
-		})
 	}
 	embedder, err := buildEmbedder(cfg)
 	if err != nil {
@@ -187,148 +163,48 @@ func runIndex(cfg config.Config, args []string) error {
 		return err
 	}
 	documentGroups := groupDocumentsByID(documentsToProcess)
-	totalChunks := 0
-	totalEmbeddingDuration := time.Duration(0)
-	totalUpsertDuration := time.Duration(0)
-	for i, documentGroup := range documentGroups {
-		docID := documentGroup[0].ID
-		documentTask := startIndexTask("process_document", map[string]any{
-			"document_id":       docID,
-			"progress_position": i + 1,
-			"progress_total":    len(documentGroups),
-		})
-		chunkTask := startIndexTask("chunk_document", map[string]any{
-			"document_id":       docID,
-			"chunk_size_tokens": chunkCfg.ChunkSizeTokens,
-			"overlap_ratio":     fmt.Sprintf("%.4f", chunkCfg.OverlapRatio),
-			"translations":      len(documentGroup),
-		})
-		chunks, chunkErr := rag.ChunkDocuments(documentGroup, chunkCfg)
-		if chunkErr != nil {
-			chunkTask.Fail(chunkErr, nil)
-			documentTask.Fail(chunkErr, map[string]any{"phase": "chunk_document"})
-			indexTask.Fail(chunkErr, map[string]any{"phase": "chunk_document", "document_id": docID})
-			return fmt.Errorf("chunk document %s: %w", docID, chunkErr)
-		}
-		chunkTask.Done(map[string]any{
-			"document_id": docID,
-			"chunks":      len(chunks),
-		})
-
-		texts := make([]string, 0, len(chunks))
-		for _, chunk := range chunks {
-			texts = append(texts, chunk.Text)
-		}
-		embeddingTask := startIndexTask("embed_document_chunks", map[string]any{
-			"document_id": docID,
-			"chunks":      len(chunks),
-			"embedder":    embedder.Name(),
-		})
-		var vectors [][]float32
-		embeddingStartedAt := time.Now()
-		documentCtx := rag.WithUsageDocumentID(ctx, docID)
-		err = runWithHeartbeat(ctx, 30*time.Second, "rag-cli: embeddings en cours... (toujours actif)", func() error {
-			var embedErr error
-			vectors, embedErr = embedder.EmbedTexts(documentCtx, texts)
-			return embedErr
-		})
-		totalEmbeddingDuration += time.Since(embeddingStartedAt)
-		if err != nil {
-			embeddingTask.Fail(err, nil)
-			documentTask.Fail(err, map[string]any{"phase": "embed_document_chunks"})
-			indexTask.Fail(err, map[string]any{"phase": "embed_document_chunks", "document_id": docID})
-			return fmt.Errorf("embed document chunks %s: %w", docID, err)
-		}
-		embeddingTask.Done(map[string]any{
-			"document_id": docID,
-			"vectors":     len(vectors),
-		})
-		if len(vectors) != len(chunks) {
-			inconsistentErr := errors.New("embedder returned inconsistent number of vectors")
-			documentTask.Fail(inconsistentErr, map[string]any{"phase": "embed_document_chunks", "chunks": len(chunks), "vectors": len(vectors)})
-			indexTask.Fail(inconsistentErr, map[string]any{"phase": "embed_document_chunks", "document_id": docID, "chunks": len(chunks), "vectors": len(vectors)})
-			return inconsistentErr
-		}
-
-		embedded := make([]rag.EmbeddedChunk, 0, len(chunks))
-		for idx, chunk := range chunks {
-			embedded = append(embedded, rag.EmbeddedChunk{
-				Chunk:  chunk,
-				Vector: vectors[idx],
-			})
-		}
-		upsertTask := startIndexTask("upsert_document_chunks", map[string]any{
-			"document_id": docID,
-			"chunks":      len(embedded),
-		})
-		upsertStartedAt := time.Now()
-		if err := store.UpsertChunks(ctx, embedded); err != nil {
-			upsertTask.Fail(err, nil)
-			documentTask.Fail(err, map[string]any{"phase": "upsert_document_chunks"})
-			indexTask.Fail(err, map[string]any{"phase": "upsert_document_chunks", "document_id": docID})
-			return fmt.Errorf("upsert document chunks %s: %w", docID, err)
-		}
-		totalUpsertDuration += time.Since(upsertStartedAt)
-		upsertTask.Done(nil)
-		totalChunks += len(chunks)
-		collectorSnapshot := usageCollector.SnapshotDocument(docID)
-		chunkTokenSum := sumChunkTokens(chunks)
-		sourceDoc := pickSourceDocumentForMetrics(documentGroup, cfg.RAG.DefaultLanguage)
-		if err := store.UpsertIndexDocumentMetrics(ctx, rag.UsageDocumentMetrics{
-			RunID:                   indexRunID,
-			DocumentID:              docID,
-			SourceLang:              sourceDoc.Language,
-			SourceContentChars:      len(sourceDoc.Content),
-			TitleChars:              len(sourceDoc.Title),
-			TranslationsAttempted:   collectorSnapshot.TranslationsAttempted,
-			TranslationsSucceeded:   collectorSnapshot.TranslationsSucceeded,
-			ChunksCount:             len(chunks),
-			ChunksTokensSum:         chunkTokenSum,
-			EmbeddingCalls:          collectorSnapshot.EmbeddingCalls,
-			EmbeddingInputCharsSum:  collectorSnapshot.EmbeddingInputCharsSum,
-			EmbeddingInputTokensSum: collectorSnapshot.EmbeddingInputTokensSum,
-			EmbeddingTotalTokensSum: collectorSnapshot.EmbeddingTotalTokensSum,
-			LLMInputTokensSum:       collectorSnapshot.LLMInputTokensSum,
-			LLMOutputTokensSum:      collectorSnapshot.LLMOutputTokensSum,
-			LLMTotalTokensSum:       collectorSnapshot.LLMTotalTokensSum,
-			Status:                  "success",
-			IndexedAtUTC:            time.Now().UTC(),
-		}); err != nil {
-			documentTask.Fail(err, map[string]any{"phase": "upsert_document_metrics"})
-			indexTask.Fail(err, map[string]any{"phase": "upsert_document_metrics", "document_id": docID})
-			return fmt.Errorf("upsert document metrics %s: %w", docID, err)
-		}
-		documentTask.Done(map[string]any{
-			"document_id": docID,
-			"chunks":      len(chunks),
-		})
+	totals, err := processDocumentGroups(ctx, processDocumentGroupsInput{
+		Cfg:            cfg,
+		Store:          store,
+		UsageCollector: usageCollector,
+		Embedder:       embedder,
+		Translator:     translator,
+		ExistingState:  existingState,
+		ChunkCfg:       chunkCfg,
+		IndexRunID:     indexRunID,
+		DocumentGroups: documentGroups,
+		Workers:        *workers,
+	})
+	if err != nil {
+		indexTask.Fail(err, map[string]any{"phase": "process_document"})
+		return err
 	}
 	totalDuration := time.Since(indexTask.startedAt)
-	processedDocumentCount := len(documentGroups)
+	processedDocumentCount := totals.ProcessedDocuments
 	avgChunksPerDocument := 0.0
 	documentsPerMinute := 0.0
 	chunksPerSecond := 0.0
 	upsertSharePercent := 0.0
 	if processedDocumentCount > 0 {
-		avgChunksPerDocument = float64(totalChunks) / float64(processedDocumentCount)
+		avgChunksPerDocument = float64(totals.TotalChunks) / float64(processedDocumentCount)
 	}
 	if totalDuration > 0 {
 		documentsPerMinute = float64(processedDocumentCount) / totalDuration.Minutes()
-		chunksPerSecond = float64(totalChunks) / totalDuration.Seconds()
-		upsertSharePercent = (float64(totalUpsertDuration) / float64(totalDuration)) * 100.0
+		chunksPerSecond = float64(totals.TotalChunks) / totalDuration.Seconds()
+		upsertSharePercent = (float64(totals.TotalUpsertDuration) / float64(totalDuration)) * 100.0
 	}
 	indexTask.Done(map[string]any{
 		"documents":           len(documentsToProcess),
-		"chunks":              totalChunks,
+		"chunks":              totals.TotalChunks,
 		"embedder":            embedder.Name(),
 		"skipped_documents":   skipReport.SkippedDocuments,
 		"grouped_documents":   skipReport.GroupedDocuments,
-		"processed_documents": skipReport.ProcessedDocs,
+		"processed_documents": processedDocumentCount,
 		"avg_chunks_per_doc":  fmt.Sprintf("%.2f", avgChunksPerDocument),
 		"docs_per_min":        fmt.Sprintf("%.2f", documentsPerMinute),
 		"chunks_per_sec":      fmt.Sprintf("%.2f", chunksPerSecond),
-		"upsert_ms":           totalUpsertDuration.Milliseconds(),
-		"embedding_ms":        totalEmbeddingDuration.Milliseconds(),
+		"upsert_ms":           totals.TotalUpsertDuration.Milliseconds(),
+		"embedding_ms":        totals.TotalEmbeddingDuration.Milliseconds(),
 		"upsert_share_pct":    fmt.Sprintf("%.2f", upsertSharePercent),
 	})
 
@@ -337,7 +213,7 @@ func runIndex(cfg config.Config, args []string) error {
 		selectedCorpus,
 		len(documentsToProcess),
 		skipReport.SkippedDocuments,
-		totalChunks,
+		totals.TotalChunks,
 		embedder.Name(),
 		totalDuration.Round(time.Second),
 	)
@@ -346,11 +222,312 @@ func runIndex(cfg config.Config, args []string) error {
 		avgChunksPerDocument,
 		documentsPerMinute,
 		chunksPerSecond,
-		totalEmbeddingDuration.Milliseconds(),
-		totalUpsertDuration.Milliseconds(),
+		totals.TotalEmbeddingDuration.Milliseconds(),
+		totals.TotalUpsertDuration.Milliseconds(),
 		upsertSharePercent,
 	)
 	return nil
+}
+
+type indexStore interface {
+	UpsertChunks(ctx context.Context, items []rag.EmbeddedChunk) error
+	UpsertIndexDocumentMetrics(ctx context.Context, metric rag.UsageDocumentMetrics) error
+}
+
+type processDocumentGroupsInput struct {
+	Cfg            config.Config
+	Store          indexStore
+	UsageCollector *indexUsageCollector
+	Embedder       rag.Embedder
+	Translator     rag.Translator
+	ExistingState  map[string]rag.IndexDocumentState
+	ChunkCfg       rag.ChunkConfig
+	IndexRunID     string
+	DocumentGroups [][]rag.Document
+	Workers        int
+}
+
+type processDocumentResult struct {
+	DocumentID        string
+	ChunkCount        int
+	EmbeddingDuration time.Duration
+	UpsertDuration    time.Duration
+}
+
+type processDocumentTotals struct {
+	ProcessedDocuments     int
+	TotalChunks            int
+	TotalEmbeddingDuration time.Duration
+	TotalUpsertDuration    time.Duration
+}
+
+func processDocumentGroups(ctx context.Context, input processDocumentGroupsInput) (processDocumentTotals, error) {
+	if input.Workers <= 0 {
+		return processDocumentTotals{}, errors.New("workers must be > 0")
+	}
+	if len(input.DocumentGroups) == 0 {
+		return processDocumentTotals{}, nil
+	}
+	jobCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	type documentJob struct {
+		position int
+		group    []rag.Document
+	}
+	jobs := make(chan documentJob)
+	results := make(chan processDocumentResult, len(input.DocumentGroups))
+
+	var (
+		wg       sync.WaitGroup
+		errOnce  sync.Once
+		firstErr error
+	)
+	workerCount := input.Workers
+	if workerCount > len(input.DocumentGroups) {
+		workerCount = len(input.DocumentGroups)
+	}
+	for worker := 0; worker < workerCount; worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				if jobCtx.Err() != nil {
+					return
+				}
+				result, err := processDocumentGroup(processDocumentGroupInput{
+					Cfg:              input.Cfg,
+					Ctx:              jobCtx,
+					Store:            input.Store,
+					UsageCollector:   input.UsageCollector,
+					Embedder:         input.Embedder,
+					Translator:       input.Translator,
+					ExistingState:    input.ExistingState,
+					ChunkCfg:         input.ChunkCfg,
+					IndexRunID:       input.IndexRunID,
+					DocumentGroup:    job.group,
+					ProgressPosition: job.position,
+					ProgressTotal:    len(input.DocumentGroups),
+				})
+				if err != nil {
+					errOnce.Do(func() {
+						firstErr = err
+						cancel()
+					})
+					return
+				}
+				results <- result
+			}
+		}()
+	}
+
+publishLoop:
+	for idx, group := range input.DocumentGroups {
+		select {
+		case <-jobCtx.Done():
+			break publishLoop
+		case jobs <- documentJob{
+			position: idx + 1,
+			group:    group,
+		}:
+		}
+	}
+	close(jobs)
+	wg.Wait()
+	close(results)
+	if firstErr != nil {
+		return processDocumentTotals{}, firstErr
+	}
+
+	totals := processDocumentTotals{}
+	for result := range results {
+		totals.ProcessedDocuments++
+		totals.TotalChunks += result.ChunkCount
+		totals.TotalEmbeddingDuration += result.EmbeddingDuration
+		totals.TotalUpsertDuration += result.UpsertDuration
+	}
+	return totals, nil
+}
+
+type processDocumentGroupInput struct {
+	Cfg              config.Config
+	Ctx              context.Context
+	Store            indexStore
+	UsageCollector   *indexUsageCollector
+	Embedder         rag.Embedder
+	Translator       rag.Translator
+	ExistingState    map[string]rag.IndexDocumentState
+	ChunkCfg         rag.ChunkConfig
+	IndexRunID       string
+	DocumentGroup    []rag.Document
+	ProgressPosition int
+	ProgressTotal    int
+}
+
+func processDocumentGroup(input processDocumentGroupInput) (processDocumentResult, error) {
+	if len(input.DocumentGroup) == 0 {
+		return processDocumentResult{}, errors.New("document group is empty")
+	}
+	docID := strings.TrimSpace(input.DocumentGroup[0].ID)
+	if docID == "" {
+		return processDocumentResult{}, errors.New("document id is required")
+	}
+
+	documentTask := startIndexTask("process_document", map[string]any{
+		"document_id":       docID,
+		"progress_position": input.ProgressPosition,
+		"progress_total":    input.ProgressTotal,
+	})
+
+	documentGroup := input.DocumentGroup
+	if input.Cfg.RAG.Mode == "llm" {
+		if input.Translator == nil {
+			err := errors.New("translator is required in llm mode")
+			documentTask.Fail(err, map[string]any{"phase": "ensure_translations"})
+			return processDocumentResult{}, err
+		}
+		translationTask := startIndexTask("ensure_document_translations", map[string]any{
+			"document_id": docID,
+			"provider":    input.Translator.Name(),
+		})
+		var err error
+		err = runWithHeartbeat(input.Ctx, 30*time.Second, "rag-cli: traduction en cours... (toujours actif)", func() error {
+			var translationErr error
+			documentGroup, translationErr = rag.EnsureMissingTranslationsWithOptions(
+				input.Ctx,
+				documentGroup,
+				input.Cfg.RAG.SupportedLanguages,
+				input.Cfg.RAG.DefaultLanguage,
+				input.Translator,
+				rag.EnsureMissingTranslationsOptions{
+					ExistingByDocument: map[string]rag.IndexDocumentState{
+						docID: input.ExistingState[docID],
+					},
+				},
+			)
+			return translationErr
+		})
+		if err != nil {
+			translationTask.Fail(err, nil)
+			documentTask.Fail(err, map[string]any{"phase": "ensure_translations"})
+			return processDocumentResult{}, fmt.Errorf("ensure translations %s: %w", docID, err)
+		}
+		translationTask.Done(map[string]any{
+			"document_id":  docID,
+			"translations": len(documentGroup),
+			"target_langs": len(input.Cfg.RAG.SupportedLanguages),
+		})
+	}
+
+	chunkTask := startIndexTask("chunk_document", map[string]any{
+		"document_id":       docID,
+		"chunk_size_tokens": input.ChunkCfg.ChunkSizeTokens,
+		"overlap_ratio":     fmt.Sprintf("%.4f", input.ChunkCfg.OverlapRatio),
+		"translations":      len(documentGroup),
+	})
+	chunks, err := rag.ChunkDocuments(documentGroup, input.ChunkCfg)
+	if err != nil {
+		chunkTask.Fail(err, nil)
+		documentTask.Fail(err, map[string]any{"phase": "chunk_document"})
+		return processDocumentResult{}, fmt.Errorf("chunk document %s: %w", docID, err)
+	}
+	chunkTask.Done(map[string]any{
+		"document_id": docID,
+		"chunks":      len(chunks),
+	})
+
+	texts := make([]string, 0, len(chunks))
+	for _, chunk := range chunks {
+		texts = append(texts, chunk.Text)
+	}
+	embeddingTask := startIndexTask("embed_document_chunks", map[string]any{
+		"document_id": docID,
+		"chunks":      len(chunks),
+		"embedder":    input.Embedder.Name(),
+	})
+	var vectors [][]float32
+	embeddingStartedAt := time.Now()
+	documentCtx := rag.WithUsageDocumentID(input.Ctx, docID)
+	err = runWithHeartbeat(input.Ctx, 30*time.Second, "rag-cli: embeddings en cours... (toujours actif)", func() error {
+		var embedErr error
+		vectors, embedErr = input.Embedder.EmbedTexts(documentCtx, texts)
+		return embedErr
+	})
+	embeddingDuration := time.Since(embeddingStartedAt)
+	if err != nil {
+		embeddingTask.Fail(err, nil)
+		documentTask.Fail(err, map[string]any{"phase": "embed_document_chunks"})
+		return processDocumentResult{}, fmt.Errorf("embed document chunks %s: %w", docID, err)
+	}
+	embeddingTask.Done(map[string]any{
+		"document_id": docID,
+		"vectors":     len(vectors),
+	})
+	if len(vectors) != len(chunks) {
+		inconsistentErr := errors.New("embedder returned inconsistent number of vectors")
+		documentTask.Fail(inconsistentErr, map[string]any{"phase": "embed_document_chunks", "chunks": len(chunks), "vectors": len(vectors)})
+		return processDocumentResult{}, inconsistentErr
+	}
+
+	embedded := make([]rag.EmbeddedChunk, 0, len(chunks))
+	for idx, chunk := range chunks {
+		embedded = append(embedded, rag.EmbeddedChunk{
+			Chunk:  chunk,
+			Vector: vectors[idx],
+		})
+	}
+	upsertTask := startIndexTask("upsert_document_chunks", map[string]any{
+		"document_id": docID,
+		"chunks":      len(embedded),
+	})
+	upsertStartedAt := time.Now()
+	if err := input.Store.UpsertChunks(input.Ctx, embedded); err != nil {
+		upsertTask.Fail(err, nil)
+		documentTask.Fail(err, map[string]any{"phase": "upsert_document_chunks"})
+		return processDocumentResult{}, fmt.Errorf("upsert document chunks %s: %w", docID, err)
+	}
+	upsertDuration := time.Since(upsertStartedAt)
+	upsertTask.Done(nil)
+
+	collectorSnapshot := indexDocumentUsageSnapshot{}
+	if input.UsageCollector != nil {
+		collectorSnapshot = input.UsageCollector.SnapshotDocument(docID)
+	}
+	chunkTokenSum := sumChunkTokens(chunks)
+	sourceDoc := pickSourceDocumentForMetrics(documentGroup, input.Cfg.RAG.DefaultLanguage)
+	if err := input.Store.UpsertIndexDocumentMetrics(input.Ctx, rag.UsageDocumentMetrics{
+		RunID:                   input.IndexRunID,
+		DocumentID:              docID,
+		SourceLang:              sourceDoc.Language,
+		SourceContentChars:      len(sourceDoc.Content),
+		TitleChars:              len(sourceDoc.Title),
+		TranslationsAttempted:   collectorSnapshot.TranslationsAttempted,
+		TranslationsSucceeded:   collectorSnapshot.TranslationsSucceeded,
+		ChunksCount:             len(chunks),
+		ChunksTokensSum:         chunkTokenSum,
+		EmbeddingCalls:          collectorSnapshot.EmbeddingCalls,
+		EmbeddingInputCharsSum:  collectorSnapshot.EmbeddingInputCharsSum,
+		EmbeddingInputTokensSum: collectorSnapshot.EmbeddingInputTokensSum,
+		EmbeddingTotalTokensSum: collectorSnapshot.EmbeddingTotalTokensSum,
+		LLMInputTokensSum:       collectorSnapshot.LLMInputTokensSum,
+		LLMOutputTokensSum:      collectorSnapshot.LLMOutputTokensSum,
+		LLMTotalTokensSum:       collectorSnapshot.LLMTotalTokensSum,
+		Status:                  "success",
+		IndexedAtUTC:            time.Now().UTC(),
+	}); err != nil {
+		documentTask.Fail(err, map[string]any{"phase": "upsert_document_metrics"})
+		return processDocumentResult{}, fmt.Errorf("upsert document metrics %s: %w", docID, err)
+	}
+	documentTask.Done(map[string]any{
+		"document_id": docID,
+		"chunks":      len(chunks),
+	})
+	return processDocumentResult{
+		DocumentID:        docID,
+		ChunkCount:        len(chunks),
+		EmbeddingDuration: embeddingDuration,
+		UpsertDuration:    upsertDuration,
+	}, nil
 }
 
 type indexTaskScope struct {
@@ -759,12 +936,12 @@ func buildEmbedder(cfg config.Config) (rag.Embedder, error) {
 func buildSummarizer(cfg config.Config) (rag.Summarizer, error) {
 	if cfg.RAG.Mode == "llm" {
 		return rag.NewLLMSummarizer(rag.LLMSummarizerConfig{
-			Enabled:         cfg.LLM.Enabled,
-			BaseURL:         cfg.LLM.BaseURL,
-			APIKey:          cfg.LLM.APIKey,
-			ModelName:       cfg.LLM.ModelName,
-			Timeout:         cfg.LLM.Timeout,
-			MaxPromptChars:  cfg.LLM.MaxPromptChars,
+			Enabled:        cfg.LLM.Enabled,
+			BaseURL:        cfg.LLM.BaseURL,
+			APIKey:         cfg.LLM.APIKey,
+			ModelName:      cfg.LLM.ModelName,
+			Timeout:        cfg.LLM.Timeout,
+			MaxPromptChars: cfg.LLM.MaxPromptChars,
 		})
 	}
 	return rag.NewDeterministicSummarizer(), nil
@@ -790,13 +967,13 @@ func buildTranslator(cfg config.Config) (rag.Translator, error) {
 		return rag.NewDisabledTranslator(), nil
 	}
 	translator, err := rag.NewLLMTranslator(rag.LLMTranslatorConfig{
-		Enabled:         cfg.LLM.Enabled,
-		BaseURL:         cfg.LLM.BaseURL,
-		APIKey:          cfg.LLM.APIKey,
-		ModelName:       cfg.LLM.ModelName,
-		Timeout:         cfg.LLM.TranslationTimeout,
-		MaxInputChars:   cfg.LLM.MaxPromptChars,
-		MaxRetries:      cfg.LLM.TranslationMaxRetries,
+		Enabled:       cfg.LLM.Enabled,
+		BaseURL:       cfg.LLM.BaseURL,
+		APIKey:        cfg.LLM.APIKey,
+		ModelName:     cfg.LLM.ModelName,
+		Timeout:       cfg.LLM.TranslationTimeout,
+		MaxInputChars: cfg.LLM.MaxPromptChars,
+		MaxRetries:    cfg.LLM.TranslationMaxRetries,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create llm translator: %w", err)
