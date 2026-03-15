@@ -13,6 +13,14 @@ import (
 	"time"
 )
 
+const (
+	UsageListMinLimit     = 1
+	UsageListDefaultLimit = 100
+	UsageListMaxLimit     = 1000
+
+	usageListInitialAllocCap = 128
+)
+
 type UsageScope struct {
 	Flow       string
 	Mode       string
@@ -580,17 +588,7 @@ DO UPDATE SET
 }
 
 func (s *PostgresVectorStore) ListUsageEvents(ctx context.Context, filter UsageListFilter) ([]UsageEventRow, error) {
-	limit := filter.Limit
-	if limit <= 0 {
-		limit = 100
-	}
-	if limit > 1000 {
-		limit = 1000
-	}
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	limit, offset := normalizeUsagePagination(filter)
 	conditions := []string{"1=1"}
 	args := []any{}
 	push := func(sqlExpr string, value any) {
@@ -628,7 +626,8 @@ LIMIT $%d OFFSET $%d
 		return nil, fmt.Errorf("list usage events: %w", err)
 	}
 	defer rows.Close()
-	out := make([]UsageEventRow, 0, limit)
+	// Keep allocation cap internal and bounded to avoid user-driven pre-allocation sizes.
+	out := make([]UsageEventRow, 0, usageListInitialAllocCap)
 	for rows.Next() {
 		var item UsageEventRow
 		var createdAt time.Time
@@ -667,17 +666,7 @@ LIMIT $%d OFFSET $%d
 }
 
 func (s *PostgresVectorStore) ListUsageDailyAggregates(ctx context.Context, filter UsageListFilter) ([]UsageDailyAggregate, error) {
-	limit := filter.Limit
-	if limit <= 0 {
-		limit = 100
-	}
-	if limit > 1000 {
-		limit = 1000
-	}
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	limit, offset := normalizeUsagePagination(filter)
 	conditions := []string{"1=1"}
 	args := []any{}
 	push := func(sqlExpr string, value any) {
@@ -714,7 +703,8 @@ LIMIT $%d OFFSET $%d
 		return nil, fmt.Errorf("list daily usage aggregates: %w", err)
 	}
 	defer rows.Close()
-	out := make([]UsageDailyAggregate, 0, limit)
+	// Keep allocation cap internal and bounded to avoid user-driven pre-allocation sizes.
+	out := make([]UsageDailyAggregate, 0, usageListInitialAllocCap)
 	for rows.Next() {
 		var item UsageDailyAggregate
 		var day time.Time
@@ -744,6 +734,21 @@ LIMIT $%d OFFSET $%d
 		return nil, fmt.Errorf("iterate daily usage aggregates: %w", err)
 	}
 	return out, nil
+}
+
+func normalizeUsagePagination(filter UsageListFilter) (int, int) {
+	limit := filter.Limit
+	if limit < UsageListMinLimit {
+		limit = UsageListDefaultLimit
+	}
+	if limit > UsageListMaxLimit {
+		limit = UsageListMaxLimit
+	}
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	return limit, offset
 }
 
 func maxInt(value int, minValue int) int {

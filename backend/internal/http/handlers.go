@@ -310,12 +310,12 @@ func parseUsageMetricsFilter(r *http.Request) (rag.UsageListFilter, string, erro
 	if granularity != "event" && granularity != "day" {
 		return rag.UsageListFilter{}, "", errors.New("granularity doit etre event ou day")
 	}
-	limit := 100
+	limit := rag.UsageListDefaultLimit
 	offset := 0
 	var err error
 	if raw := strings.TrimSpace(q.Get("limit")); raw != "" {
 		limit, err = strconv.Atoi(raw)
-		if err != nil || limit < 1 || limit > 1000 {
+		if err != nil || limit < rag.UsageListMinLimit || limit > rag.UsageListMaxLimit {
 			return rag.UsageListFilter{}, "", errors.New("limit doit etre entre 1 et 1000")
 		}
 	}

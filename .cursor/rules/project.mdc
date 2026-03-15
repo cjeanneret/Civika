@@ -65,6 +65,12 @@ alwaysApply: true
 - JSON:
   - utiliser `json.Encoder` / `json.Decoder`,
   - servir `Content-Type: application/json; charset=utf-8`.
+- Allocations mémoire contrôlées (Go):
+  - toute taille dérivée d'une entrée externe (HTTP, DB, fichier, LLM, source distante) doit être validée avec bornes explicites avant allocation.
+  - interdire `make([]T, n)` ou `make([]T, 0, n)` avec un `n` non borné ou directement piloté par un input utilisateur.
+  - définir des limites max explicites (constantes nommées) et appliquer une normalisation avant toute utilisation.
+  - en cas de dépassement ou valeur incohérente, retourner une erreur explicite ou appliquer un clamp documenté; pas de fallback silencieux.
+  - ajouter au minimum un test de non-régression sur les bornes (négatif, zéro, très grand).
 
 ## Exigences sécurité frontend
 - TypeScript strict activé, sans `any` implicites.
