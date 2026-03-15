@@ -33,6 +33,42 @@ Ce document formalise:
 
 - `docs/plans/PLAN-20260315-llm-usage-audit-and-token-reduction.md` (ce document)
 
+## Etat d'avancement (2026-03-15)
+
+### Livre
+
+- Phase 1 complete:
+  - borne de sortie LLM explicite (`max_tokens`) pour summarization/traduction,
+  - renforcement prompt de sortie courte (resume QA "1 a 2 phrases"),
+  - cablage retries traduction cote API,
+  - suppression `response_preview` dans logs de traduction.
+- Phase 2 partiellement livree:
+  - cache QA L1 exact + L2 semantique en memoire,
+  - configuration `QA_CACHE_*` exposee dans env/config/docs,
+  - garde-fous privacy sur cacheabilite (question sanitisee, bypass donnees redacted),
+  - endpoint dedie `GET /api/v1/metrics/qa-cache`,
+  - metriques cache: exact/semantic hits, misses, bypass, score moyen, estimation tokens economises.
+- Securite config memoire:
+  - clamp explicite des capacites cache (`QA_CACHE_EXACT_MAX_ENTRIES`, `QA_CACHE_SEMANTIC_MAX_ENTRIES`) avec tests de non-regression.
+
+### Partiel
+
+- Design "cache semantique persistant" documente mais non implemente:
+  - pas de table/vector index persistant dedie QA,
+  - pas de store persistant `qa_semantic_cache`.
+- Invalidation avancee versionnee:
+  - contexte strict implemente (langue, ids, mode, modeles, topK),
+  - mais pas encore `promptVersion`/`indexVersion` explicites dans la cle runtime.
+
+### A faire (prochaine reprise)
+
+- Phase 2.1: token accounting pre-appel (budget input/output avant appel LLM).
+- Phase 2.2: budget journalier soft/hard avec blocage explicite et alerting.
+- Phase 2.4: batching embeddings borne (`LLM_EMBEDDING_MAX_BATCH_ITEMS`).
+- Eventuellement: persistance cache semantique QA en base (`pgvector`) + purge/invalidation versionnee.
+- Completer l'observabilite cout:
+  - endpoint/agrégats periodiques "tokens economises" consolides par jour/mode/modele.
+
 ## Cartographie des usages LLM
 
 ### Appels LLM directs (runtime backend)
@@ -353,17 +389,17 @@ flowchart TD
 
 ## Checklist de verification post-generation
 
-- [ ] Audit complete des points d'appel LLM valide (API, services, CLI).
-- [ ] Limites existantes documentees avec valeurs effectives.
-- [ ] Ecarts prioritaires traces avec impact cout/privacy.
-- [ ] Regles cache privacy-first formalisees (autorise/interdit/invalidation).
-- [ ] Backlog priorise en phases (quick wins -> moyen terme -> optionnel).
-- [ ] Aucun conflit avec regles `privacy.mdc` et `project.mdc`.
-- [ ] Procedure de verification securite/logging definie.
-- [ ] Documentation des futures variables de config prevue.
-- [ ] Tests de similarite L2: cas positifs et faux positifs.
+- [x] Audit complete des points d'appel LLM valide (API, services, CLI).
+- [x] Limites existantes documentees avec valeurs effectives.
+- [x] Ecarts prioritaires traces avec impact cout/privacy.
+- [x] Regles cache privacy-first formalisees (autorise/interdit/invalidation).
+- [x] Backlog priorise en phases (quick wins -> moyen terme -> optionnel).
+- [x] Aucun conflit avec regles `privacy.mdc` et `project.mdc`.
+- [x] Procedure de verification securite/logging definie.
+- [x] Documentation des futures variables de config prevue.
+- [x] Tests de similarite L2: cas positifs et faux positifs.
 - [ ] Tests d'invalidation: changement modele/prompt/index/mode.
-- [ ] Tests privacy: aucune IP/PII en stockage et logs.
+- [x] Tests privacy: aucune IP/PII en stockage et logs.
 
 ## Contraintes securite impactees
 
