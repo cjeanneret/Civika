@@ -9,6 +9,7 @@ This section centralizes the project's operational and technical documentation.
 - Design and architecture: [`design.en.md`](design.en.md)
 - OpenParlData fetch: [`data-fetch.en.md`](data-fetch.en.md)
 - AI usage transparency: [`ai-usage.en.md`](ai-usage.en.md)
+- API functional tests: [`api-functional-tests.en.md`](api-functional-tests.en.md)
 - Implementation plans: [`plans/`](plans/)
 - Security audits: [`audits/`](audits/)
 

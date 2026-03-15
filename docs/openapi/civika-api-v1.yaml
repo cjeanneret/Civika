@@ -1,0 +1,775 @@
+openapi: 3.0.3
+info:
+  title: Civika API
+  version: v1
+  description: >
+    Contrat public de l'API Civika V1 pour la validation fonctionnelle
+    et contractuelle en CI.
+servers:
+  - url: http://127.0.0.1:8080
+tags:
+  - name: Core
+  - name: Votations
+  - name: QA
+  - name: Metrics
+paths:
+  /:
+    get:
+      tags: [Core]
+      summary: Informations racine de l'API
+      operationId: getRoot
+      responses:
+        "200":
+          description: Informations du service et routes exposees
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RootResponse"
+  /health:
+    get:
+      tags: [Core]
+      summary: Sante de l'API
+      operationId: getHealth
+      responses:
+        "200":
+          description: API operationnelle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /info:
+    get:
+      tags: [Core]
+      summary: Informations runtime
+      operationId: getInfo
+      responses:
+        "200":
+          description: Version et mode RAG actif
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InfoResponse"
+  /api/v1/votations:
+    get:
+      tags: [Votations]
+      summary: Liste des votations
+      operationId: listVotations
+      parameters:
+        - $ref: "#/components/parameters/LimitVotations"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Level"
+        - $ref: "#/components/parameters/Canton"
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/Lang"
+        - $ref: "#/components/parameters/DateFrom"
+        - $ref: "#/components/parameters/DateTo"
+      responses:
+        "200":
+          description: Liste paginee
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VotationListResult"
+        "400":
+          $ref: "#/components/responses/InvalidQuery"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /api/v1/votations/{id}:
+    get:
+      tags: [Votations]
+      summary: Detail d'une votation
+      operationId: getVotationById
+      parameters:
+        - $ref: "#/components/parameters/VotationId"
+        - $ref: "#/components/parameters/Lang"
+      responses:
+        "200":
+          description: Detail de votation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VotationDetail"
+        "400":
+          $ref: "#/components/responses/InvalidPathParam"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /api/v1/votations/{id}/objects:
+    get:
+      tags: [Votations]
+      summary: Objets rattaches a une votation
+      operationId: listVotationObjects
+      parameters:
+        - $ref: "#/components/parameters/VotationId"
+        - $ref: "#/components/parameters/Lang"
+      responses:
+        "200":
+          description: Liste des objets
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ObjectSummary"
+        "400":
+          $ref: "#/components/responses/InvalidPathParam"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /api/v1/objects/{objectId}:
+    get:
+      tags: [Votations]
+      summary: Detail d'un objet
+      operationId: getObjectById
+      parameters:
+        - $ref: "#/components/parameters/ObjectId"
+        - $ref: "#/components/parameters/Lang"
+      responses:
+        "200":
+          description: Detail d'objet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObjectDetail"
+        "400":
+          $ref: "#/components/responses/InvalidPathParam"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /api/v1/objects/{objectId}/sources:
+    get:
+      tags: [Votations]
+      summary: Sources d'un objet
+      operationId: listObjectSources
+      parameters:
+        - $ref: "#/components/parameters/ObjectId"
+      responses:
+        "200":
+          description: Liste des sources
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ObjectSource"
+        "400":
+          $ref: "#/components/responses/InvalidPathParam"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /api/v1/taxonomies:
+    get:
+      tags: [Votations]
+      summary: Taxonomies de l'API
+      operationId: getTaxonomies
+      responses:
+        "200":
+          description: Valeurs de reference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Taxonomies"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /api/v1/qa/query:
+    post:
+      tags: [QA]
+      summary: Requete QA
+      operationId: postQAQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QAQueryInput"
+      responses:
+        "200":
+          description: Reponse QA
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QAQueryOutput"
+        "400":
+          $ref: "#/components/responses/InvalidBody"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /api/v1/metrics/ai-usage:
+    get:
+      tags: [Metrics]
+      summary: Export des metriques IA
+      operationId: getAiUsageMetrics
+      parameters:
+        - $ref: "#/components/parameters/Granularity"
+        - $ref: "#/components/parameters/Flow"
+        - $ref: "#/components/parameters/Operation"
+        - $ref: "#/components/parameters/Mode"
+        - $ref: "#/components/parameters/LimitMetrics"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: Metriques journaliere ou evenementielle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageMetricsResponse"
+        "400":
+          $ref: "#/components/responses/InvalidQuery"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+components:
+  parameters:
+    VotationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-zA-Z0-9:_\\-.]{2,120}$"
+    ObjectId:
+      name: objectId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-zA-Z0-9:_\\-.]{2,120}$"
+    Lang:
+      name: lang
+      in: query
+      required: false
+      schema:
+        type: string
+        pattern: "^[a-z]{2}(-[a-z]{2})?$"
+    DateFrom:
+      name: date_from
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+    DateTo:
+      name: date_to
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+    LimitVotations:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+    LimitMetrics:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+    Offset:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+    Level:
+      name: level
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [federal, cantonal, communal]
+    Canton:
+      name: canton
+      in: query
+      required: false
+      schema:
+        type: string
+        pattern: "^[A-Z]{2,3}$"
+    Status:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [past, upcoming]
+    Granularity:
+      name: granularity
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [event, day]
+    Flow:
+      name: flow
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [rag_index, qa_query]
+    Operation:
+      name: operation
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [embedding, translation, summarization]
+    Mode:
+      name: mode
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [local, llm]
+    From:
+      name: from
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+    To:
+      name: to
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+
+  responses:
+    InvalidQuery:
+      description: Parametres de requete invalides
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/APIError"
+    InvalidBody:
+      description: Corps de requete invalide
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/APIError"
+    InvalidPathParam:
+      description: Parametre de chemin invalide
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/APIError"
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/APIError"
+    TooManyRequests:
+      description: Limite de debit depassee
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/APIError"
+    ServiceUnavailable:
+      description: Service indisponible
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/APIError"
+
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: ok
+
+    InfoResponse:
+      type: object
+      required: [version, ragMode, features]
+      properties:
+        version:
+          type: string
+        ragMode:
+          type: string
+        features:
+          type: array
+          items:
+            type: string
+
+    RootResponse:
+      type: object
+      required: [service, apiVersion, ragMode, endpoints]
+      properties:
+        service:
+          type: string
+        apiVersion:
+          type: string
+        ragMode:
+          type: string
+        endpoints:
+          type: object
+          additionalProperties: true
+
+    APIError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        requestId:
+          type: string
+
+    TranslationState:
+      type: object
+      required: [state]
+      properties:
+        state:
+          type: string
+        requestedLanguage:
+          type: string
+        fallbackLanguage:
+          type: string
+        message:
+          type: string
+
+    VotationListItem:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        dateIso:
+          type: string
+          format: date-time
+        level:
+          type: string
+        canton:
+          type: string
+        communeCode:
+          type: string
+        communeName:
+          type: string
+        status:
+          type: string
+        language:
+          type: string
+        titles:
+          type: object
+          additionalProperties:
+            type: string
+        displayTitles:
+          type: object
+          additionalProperties:
+            type: string
+        translationStatus:
+          $ref: "#/components/schemas/TranslationState"
+        objectIds:
+          type: array
+          items:
+            type: string
+        sourceUrls:
+          type: array
+          items:
+            type: string
+
+    VotationListResult:
+      type: object
+      required: [items, limit, offset, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/VotationListItem"
+        limit:
+          type: integer
+        offset:
+          type: integer
+        total:
+          type: integer
+
+    VotationDetail:
+      allOf:
+        - $ref: "#/components/schemas/VotationListItem"
+
+    ObjectSummary:
+      type: object
+      required: [id, title]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        theme:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+
+    ObjectDetail:
+      type: object
+      required: [id, title]
+      properties:
+        id:
+          type: string
+        votationId:
+          type: string
+        language:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        theme:
+          type: string
+        sections:
+          type: object
+          additionalProperties:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        sourceSystems:
+          type: array
+          items:
+            type: string
+
+    ObjectSource:
+      type: object
+      required: [type, title, url]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+          format: uri
+        origin:
+          type: string
+
+    Taxonomies:
+      type: object
+      required: [levels, cantons, statuses, languages, objectTypes, themes]
+      properties:
+        levels:
+          type: array
+          items:
+            type: string
+        cantons:
+          type: array
+          items:
+            type: string
+        statuses:
+          type: array
+          items:
+            type: string
+        languages:
+          type: array
+          items:
+            type: string
+        objectTypes:
+          type: array
+          items:
+            type: string
+        themes:
+          type: array
+          items:
+            type: string
+
+    QAQueryInput:
+      type: object
+      required: [question, language]
+      properties:
+        question:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        language:
+          type: string
+          pattern: "^[a-z]{2}(-[a-z]{2})?$"
+        context:
+          type: object
+          properties:
+            votationId:
+              type: string
+              pattern: "^[a-zA-Z0-9:_\\-.]{2,120}$"
+            objectId:
+              type: string
+              pattern: "^[a-zA-Z0-9:_\\-.]{2,120}$"
+            canton:
+              type: string
+              pattern: "^[A-Z]{2,3}$"
+        client:
+          type: object
+          properties:
+            instance:
+              type: string
+            version:
+              type: string
+      additionalProperties: false
+
+    Citation:
+      type: object
+      required: [sourceType, url, title]
+      properties:
+        sourceType:
+          type: string
+        url:
+          type: string
+        title:
+          type: string
+
+    QAQueryMeta:
+      type: object
+      required: [confidence, usedDocuments]
+      properties:
+        confidence:
+          type: number
+        usedDocuments:
+          type: array
+          items:
+            type: string
+
+    QAQueryOutput:
+      type: object
+      required: [answer, language, citations, meta]
+      properties:
+        answer:
+          type: string
+        language:
+          type: string
+        citations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Citation"
+        meta:
+          $ref: "#/components/schemas/QAQueryMeta"
+
+    UsageEventRow:
+      type: object
+      required:
+        - eventId
+        - createdAt
+        - flow
+        - operation
+        - mode
+        - providerName
+        - modelName
+        - runId
+        - requestId
+        - documentId
+        - sourceLang
+        - targetLang
+        - inputChars
+        - outputChars
+        - inputTokens
+        - outputTokens
+        - totalTokens
+        - usageSource
+        - status
+        - durationMs
+        - errorCode
+      properties:
+        eventId: { type: string }
+        createdAt:
+          type: string
+          format: date-time
+        flow: { type: string }
+        operation: { type: string }
+        mode: { type: string }
+        providerName: { type: string }
+        modelName: { type: string }
+        runId: { type: string }
+        requestId: { type: string }
+        documentId: { type: string }
+        sourceLang: { type: string }
+        targetLang: { type: string }
+        inputChars: { type: integer }
+        outputChars: { type: integer }
+        inputTokens: { type: integer }
+        outputTokens: { type: integer }
+        totalTokens: { type: integer }
+        usageSource: { type: string }
+        status: { type: string }
+        durationMs: { type: integer, format: int64 }
+        errorCode: { type: string }
+
+    UsageDailyAggregate:
+      type: object
+      required:
+        - day
+        - flow
+        - operation
+        - mode
+        - modelName
+        - providerName
+        - eventsCount
+        - successCount
+        - errorCount
+        - inputCharsSum
+        - outputCharsSum
+        - inputTokensSum
+        - outputTokensSum
+        - totalTokensSum
+        - durationMsSum
+      properties:
+        day: { type: string }
+        flow: { type: string }
+        operation: { type: string }
+        mode: { type: string }
+        modelName: { type: string }
+        providerName: { type: string }
+        eventsCount: { type: integer, format: int64 }
+        successCount: { type: integer, format: int64 }
+        errorCount: { type: integer, format: int64 }
+        inputCharsSum: { type: integer, format: int64 }
+        outputCharsSum: { type: integer, format: int64 }
+        inputTokensSum: { type: integer, format: int64 }
+        outputTokensSum: { type: integer, format: int64 }
+        totalTokensSum: { type: integer, format: int64 }
+        durationMsSum: { type: integer, format: int64 }
+
+    UsageMetricsResponse:
+      type: object
+      required: [granularity, items, meta]
+      properties:
+        granularity:
+          type: string
+          enum: [event, day]
+        items:
+          anyOf:
+            - type: array
+              items:
+                $ref: "#/components/schemas/UsageEventRow"
+            - type: array
+              items:
+                $ref: "#/components/schemas/UsageDailyAggregate"
+        meta:
+          type: object
+          required: [count]
+          properties:
+            count:
+              type: integer

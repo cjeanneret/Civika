@@ -9,6 +9,7 @@ Cette section centralise la documentation opérationnelle et technique du projet
 - Design et architecture: [`design.md`](design.md)
 - Data fetch OpenParlData: [`data-fetch.md`](data-fetch.md)
 - Transparence sur l'usage de l'IA: [`ai-usage.md`](ai-usage.md)
+- Tests fonctionnels API: [`api-functional-tests.md`](api-functional-tests.md)
 - Plans d'implémentation: [`plans/`](plans/)
 - Audits de sécurité: [`audits/`](audits/)
 

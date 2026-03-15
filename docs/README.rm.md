@@ -9,6 +9,7 @@ Questa secziun centralisescha la documentaziun operativa e tecnica dal project.
 - Design ed architectura: [`design.rm.md`](design.rm.md)
 - Data fetch OpenParlData: [`data-fetch.rm.md`](data-fetch.rm.md)
 - Transparenza utilisaziun IA: [`ai-usage.rm.md`](ai-usage.rm.md)
+- Tests funcziunals API: [`api-functional-tests.rm.md`](api-functional-tests.rm.md)
 - Plans d'implementaziun: [`plans/`](plans/)
 - Audits da segirezza: [`audits/`](audits/)
 
