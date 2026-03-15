@@ -1,0 +1,158 @@
+name: Helm Chart Validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  helm-validate:
+    name: Lint and template civika chart
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Helm lint
+        run: helm lint deploy/helm/civika
+
+      - name: Setup Python for manifest assertions
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML
+        run: python -m pip install --disable-pip-version-check pyyaml
+
+      - name: Render managed mode
+        run: |
+          helm template civika deploy/helm/civika \
+            --set postgresql.mode=managed \
+            > /tmp/civika-managed.yaml
+
+      - name: Strict assertions (managed mode)
+        run: |
+          python - <<'PY'
+          import sys
+          import yaml
+
+          def fail(msg: str) -> None:
+              print(msg)
+              sys.exit(1)
+
+          with open("/tmp/civika-managed.yaml", "r", encoding="utf-8") as fh:
+              docs = [d for d in yaml.safe_load_all(fh) if isinstance(d, dict)]
+
+          def by_kind(kind: str):
+              return [d for d in docs if d.get("kind") == kind]
+
+          def named(kind: str, name: str):
+              for d in by_kind(kind):
+                  if d.get("metadata", {}).get("name") == name:
+                      return d
+              return None
+
+          clusters = [d for d in by_kind("Cluster") if str(d.get("apiVersion", "")).startswith("postgresql.cnpg.io/")]
+          if len(clusters) != 1:
+              fail(f"Expected exactly 1 CloudNativePG Cluster in managed mode, got {len(clusters)}")
+
+          backend_deploy = named("Deployment", "civika-backend")
+          frontend_deploy = named("Deployment", "civika-frontend")
+          if not backend_deploy or not frontend_deploy:
+              fail("Backend/frontend deployments are missing in managed mode")
+
+          if backend_deploy.get("spec", {}).get("replicas") != 1:
+              fail("backend.replicaCount must render to 1 by default")
+          if frontend_deploy.get("spec", {}).get("replicas") != 1:
+              fail("frontend.replicaCount must render to 1 by default")
+
+          backend_service = named("Service", "civika-backend")
+          frontend_service = named("Service", "civika-frontend")
+          if not backend_service or not frontend_service:
+              fail("Backend/frontend services are missing in managed mode")
+          if backend_service.get("spec", {}).get("type") != "LoadBalancer":
+              fail("Backend service type must be LoadBalancer by default")
+          if frontend_service.get("spec", {}).get("type") != "LoadBalancer":
+              fail("Frontend service type must be LoadBalancer by default")
+
+          backend_route = named("Route", "civika-backend")
+          frontend_route = named("Route", "civika-frontend")
+          if not backend_route or not frontend_route:
+              fail("OpenShift routes must be rendered by default")
+
+          rag_job = named("Job", "civika-rag-chunker")
+          if not rag_job:
+              fail("rag_chunker Job must be rendered by default")
+          if rag_job.get("spec", {}).get("parallelism") != 2:
+              fail("rag_chunker job.parallelism must default to 2")
+          if rag_job.get("spec", {}).get("completions") != 2:
+              fail("rag_chunker job.completions must default to 2")
+
+          rag_cron = named("CronJob", "civika-rag-chunker")
+          if rag_cron:
+              fail("rag_chunker CronJob must be disabled by default")
+
+          container = backend_deploy.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [{}])[0]
+          env_map = {e.get("name"): e.get("value") for e in container.get("env", []) if isinstance(e, dict)}
+          if env_map.get("POSTGRES_HOST") != "civika-postgres-rw":
+              fail("POSTGRES_HOST must point to managed RW service")
+          if env_map.get("POSTGRES_RO_HOST") != "civika-postgres-ro":
+              fail("POSTGRES_RO_HOST must point to managed RO service")
+          PY
+
+      - name: Render external mode
+        run: |
+          helm template civika deploy/helm/civika \
+            --set postgresql.mode=external \
+            --set postgresql.external.rwHost=postgres-rw.example.internal \
+            --set postgresql.external.roHost=postgres-ro.example.internal \
+            --set postgresql.external.user=civika \
+            --set postgresql.external.database=civika \
+            > /tmp/civika-external.yaml
+
+      - name: Strict assertions (external mode)
+        run: |
+          python - <<'PY'
+          import sys
+          import yaml
+
+          def fail(msg: str) -> None:
+              print(msg)
+              sys.exit(1)
+
+          with open("/tmp/civika-external.yaml", "r", encoding="utf-8") as fh:
+              docs = [d for d in yaml.safe_load_all(fh) if isinstance(d, dict)]
+
+          clusters = [
+              d for d in docs
+              if d.get("kind") == "Cluster" and str(d.get("apiVersion", "")).startswith("postgresql.cnpg.io/")
+          ]
+          if clusters:
+              fail("CloudNativePG Cluster must not be rendered in external mode")
+
+          backend_deploy = None
+          for d in docs:
+              if d.get("kind") == "Deployment" and d.get("metadata", {}).get("name") == "civika-backend":
+                  backend_deploy = d
+                  break
+          if not backend_deploy:
+              fail("Backend deployment missing in external mode")
+
+          container = backend_deploy.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [{}])[0]
+          env_map = {e.get("name"): e.get("value") for e in container.get("env", []) if isinstance(e, dict)}
+
+          if env_map.get("POSTGRES_HOST") != "postgres-rw.example.internal":
+              fail("POSTGRES_HOST must use external RW host in external mode")
+          if env_map.get("POSTGRES_RO_HOST") != "postgres-ro.example.internal":
+              fail("POSTGRES_RO_HOST must use external RO host in external mode")
+          PY

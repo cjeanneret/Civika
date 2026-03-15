@@ -1,0 +1,7 @@
+apiVersion: v2
+name: civika
+description: Helm chart OpenShift-ready pour Civika
+icon: https://raw.githubusercontent.com/cjeanneret/Civika/main/frontend/src/app/icon.png
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

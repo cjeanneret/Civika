@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "civika.frontendName" . }}
+  labels:
+    {{- include "civika.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "civika.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: frontend
+  template:
+    metadata:
+      labels:
+        {{- include "civika.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: frontend
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.frontend.podSecurityContext | nindent 8 }}
+      containers:
+        - name: frontend
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.frontend.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: INTERNAL_API_BASE_URL
+              value: {{ default (printf "http://%s:%v" (include "civika.backendServiceName" .) .Values.backend.service.port) .Values.frontend.env.INTERNAL_API_BASE_URL | quote }}
+            - name: NEXT_PUBLIC_API_BASE_URL
+              value: {{ .Values.frontend.env.NEXT_PUBLIC_API_BASE_URL | quote }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.frontend.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.frontend.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontend.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.frontend.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.frontend.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.frontend.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.frontend.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.frontend.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.frontend.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.frontend.probes.readiness.failureThreshold }}
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}

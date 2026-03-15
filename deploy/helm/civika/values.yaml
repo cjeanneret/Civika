@@ -1,0 +1,221 @@
+nameOverride: ""
+fullnameOverride: ""
+
+global:
+  imagePullSecrets: []
+
+backend:
+  replicaCount: 1
+  image:
+    repository: civika/backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: LoadBalancer
+    port: 8080
+    targetPort: 8080
+  resources: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+  probes:
+    liveness:
+      path: /health
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 2
+      failureThreshold: 3
+    readiness:
+      path: /health
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      timeoutSeconds: 2
+      failureThreshold: 3
+  env:
+    API_HOST: "0.0.0.0"
+    API_PORT: "8080"
+    API_READ_TIMEOUT: "10s"
+    API_WRITE_TIMEOUT: "10s"
+    API_IDLE_TIMEOUT: "30s"
+    API_BODY_MAX_BYTES: "1048576"
+    POSTGRES_SSLMODE: "disable"
+    POSTGRES_MAX_OPEN_CONNS: "10"
+    POSTGRES_MAX_IDLE_CONNS: "5"
+    RAG_MODE: "local"
+    RAG_INDEX_TIMEOUT: "0s"
+    RAG_TOP_K: "5"
+    RAG_CHUNK_SIZE_TOKENS: "768"
+    RAG_CHUNK_OVERLAP_RATIO: "0.15"
+    RAG_TABLE_NAME: "rag_chunks"
+    RAG_EMBEDDING_DIMENSIONS: "128"
+    RAG_SUPPORTED_LANGUAGES: "fr,de,it,rm,en"
+    RAG_DEFAULT_LANGUAGE: "fr"
+    RAG_FALLBACK_LANGUAGE: "en"
+    LLM_ENABLED: "false"
+    LLM_BASE_URL: ""
+    LLM_MODEL_NAME: ""
+    LLM_TIMEOUT: "10s"
+    LLM_TRANSLATION_TIMEOUT: "10s"
+    LLM_TRANSLATION_MAX_RETRIES: "2"
+    LLM_MAX_PROMPT_CHARS: "4000"
+    LLM_EMBEDDING_ENABLED: "false"
+    LLM_EMBEDDING_BASE_URL: ""
+    LLM_EMBEDDING_MODEL_NAME: ""
+    LLM_EMBEDDING_TIMEOUT: "10s"
+    LLM_EMBEDDING_MAX_INPUT_CHARS: "4000"
+  secrets:
+    existingSecret: ""
+    llmApiKeyKey: LLM_API_KEY
+    llmEmbeddingApiKeyKey: LLM_EMBEDDING_API_KEY
+    postgresPasswordKey: POSTGRES_PASSWORD
+    data:
+      LLM_API_KEY: ""
+      LLM_EMBEDDING_API_KEY: ""
+      POSTGRES_PASSWORD: ""
+
+frontend:
+  replicaCount: 1
+  image:
+    repository: civika/frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: LoadBalancer
+    port: 3000
+    targetPort: 3000
+  resources: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+  probes:
+    liveness:
+      path: /
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 2
+      failureThreshold: 3
+    readiness:
+      path: /
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 2
+      failureThreshold: 3
+  env:
+    INTERNAL_API_BASE_URL: ""
+    NEXT_PUBLIC_API_BASE_URL: ""
+
+postgresql:
+  mode: managed
+  user: civika
+  database: civika
+  port: 5432
+  sslMode: disable
+  managed:
+    instances: 3
+    imageName: ghcr.io/cloudnative-pg/postgresql:17
+    storage:
+      size: 10Gi
+      storageClass: ""
+    resources: {}
+    existingCredentialsSecret: ""
+    credentials:
+      username: civika
+      password: ""
+  external:
+    rwHost: ""
+    roHost: ""
+    port: 5432
+    database: civika
+    user: civika
+    existingCredentialsSecret: ""
+    credentials:
+      password: ""
+
+ragChunker:
+  image:
+    repository: civika/backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
+  resources: {}
+  env:
+    RAG_MODE: "local"
+    RAG_EMBEDDING_DIMENSIONS: "128"
+    RAG_TABLE_NAME: "rag_chunks"
+    RAG_INDEX_TIMEOUT: "0s"
+    LLM_ENABLED: "false"
+    LLM_BASE_URL: ""
+    LLM_MODEL_NAME: ""
+    LLM_EMBEDDING_ENABLED: "false"
+    LLM_EMBEDDING_BASE_URL: ""
+    LLM_EMBEDDING_MODEL_NAME: ""
+  command:
+    - /bin/sh
+    - -lc
+    - /app/data-fetch && /app/rag-cli index --corpus /app/data/normalized --workers 4
+  dataVolume:
+    enabled: true
+    mountPath: /app/data
+    existingClaim: ""
+    size: 10Gi
+    storageClass: ""
+  job:
+    enabled: true
+    backoffLimit: 2
+    parallelism: 2
+    completions: 2
+    ttlSecondsAfterFinished: 86400
+    restartPolicy: Never
+  cron:
+    enabled: false
+    schedule: "0 2 * * *"
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    startingDeadlineSeconds: 300
+    suspend: false
+    restartPolicy: OnFailure
+
+openshift:
+  routes:
+    enabled: true
+    backend:
+      enabled: true
+      host: ""
+      tls:
+        enabled: true
+        termination: edge
+        insecureEdgeTerminationPolicy: Redirect
+    frontend:
+      enabled: true
+      host: ""
+      tls:
+        enabled: true
+        termination: edge
+        insecureEdgeTerminationPolicy: Redirect
+
+networkPolicy:
+  enabled: true

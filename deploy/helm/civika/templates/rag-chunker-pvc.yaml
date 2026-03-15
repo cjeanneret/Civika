@@ -1,0 +1,18 @@
+{{- if and .Values.ragChunker.dataVolume.enabled (not .Values.ragChunker.dataVolume.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "civika.ragDataPvcName" . }}
+  labels:
+    {{- include "civika.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rag-chunker
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.ragChunker.dataVolume.size | quote }}
+  {{- with .Values.ragChunker.dataVolume.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+{{- end }}

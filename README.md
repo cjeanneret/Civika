@@ -45,6 +45,15 @@ Le projet combine une API backend en Go, un frontend TypeScript et une chaîne R
 - Des sessions de debugging assistées par IA ont aussi été menées.
 - Détails: [`docs/ai-usage.md`](docs/ai-usage.md)
 
+## Déploiement OpenShift (Helm)
+- Chart Helm: [`deploy/helm/civika`](deploy/helm/civika)
+- Ce chart supporte:
+  - backend et frontend avec `replicaCount=1` par défaut,
+  - services `LoadBalancer` et routes OpenShift optionnelles,
+  - PostgreSQL en mode `managed` (CloudNativePG) ou `external`,
+  - `rag_chunker` en Job parallèle et CronJob optionnel.
+- Détails de configuration et exemples: [`docs/advanced-usage.md`](docs/advanced-usage.md)
+
 ## Langues
 La documentation principale est disponible en:
 - Français: `README.md`

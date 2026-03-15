@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "civika.backendName" . }}
+  labels:
+    {{- include "civika.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "civika.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        {{- include "civika.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.backend.podSecurityContext | nindent 8 }}
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.backend.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: POSTGRES_HOST
+              value: {{ include "civika.postgresRwHost" . | quote }}
+            - name: POSTGRES_RO_HOST
+              value: {{ include "civika.postgresRoHost" . | quote }}
+            - name: POSTGRES_PORT
+              value: {{ include "civika.postgresPort" . | quote }}
+            - name: POSTGRES_USER
+              value: {{ include "civika.postgresUser" . | quote }}
+            - name: POSTGRES_DB
+              value: {{ include "civika.postgresDatabase" . | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "civika.postgresCredentialsSecretName" . }}
+                  key: password
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "civika.backendSecretName" . }}
+                  key: {{ .Values.backend.secrets.llmApiKeyKey }}
+            - name: LLM_EMBEDDING_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "civika.backendSecretName" . }}
+                  key: {{ .Values.backend.secrets.llmEmbeddingApiKeyKey }}
+            {{- range $name, $value := .Values.backend.env }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.backend.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.backend.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.backend.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.backend.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.backend.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.backend.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.backend.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.backend.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.backend.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.backend.probes.readiness.failureThreshold }}
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}

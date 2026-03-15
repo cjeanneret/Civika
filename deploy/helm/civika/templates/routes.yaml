@@ -1,0 +1,49 @@
+{{- if .Values.openshift.routes.enabled }}
+{{- if .Values.openshift.routes.backend.enabled }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "civika.backendName" . }}
+  labels:
+    {{- include "civika.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  to:
+    kind: Service
+    name: {{ include "civika.backendServiceName" . }}
+  port:
+    targetPort: http
+  {{- with .Values.openshift.routes.backend.host }}
+  host: {{ . | quote }}
+  {{- end }}
+  {{- if .Values.openshift.routes.backend.tls.enabled }}
+  tls:
+    termination: {{ .Values.openshift.routes.backend.tls.termination }}
+    insecureEdgeTerminationPolicy: {{ .Values.openshift.routes.backend.tls.insecureEdgeTerminationPolicy }}
+  {{- end }}
+---
+{{- end }}
+{{- if .Values.openshift.routes.frontend.enabled }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "civika.frontendName" . }}
+  labels:
+    {{- include "civika.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  to:
+    kind: Service
+    name: {{ include "civika.frontendServiceName" . }}
+  port:
+    targetPort: http
+  {{- with .Values.openshift.routes.frontend.host }}
+  host: {{ . | quote }}
+  {{- end }}
+  {{- if .Values.openshift.routes.frontend.tls.enabled }}
+  tls:
+    termination: {{ .Values.openshift.routes.frontend.tls.termination }}
+    insecureEdgeTerminationPolicy: {{ .Values.openshift.routes.frontend.tls.insecureEdgeTerminationPolicy }}
+  {{- end }}
+{{- end }}
+{{- end }}

@@ -43,6 +43,15 @@ Il progetto combina un'API backend in Go, un frontend TypeScript e una pipeline 
 - Sono state svolte anche sessioni di debugging assistite da IA.
 - Dettagli: [`docs/ai-usage.it.md`](docs/ai-usage.it.md)
 
+## Deploy OpenShift (Helm)
+- Chart Helm: [`deploy/helm/civika`](deploy/helm/civika)
+- Il chart supporta:
+  - backend e frontend con `replicaCount=1` come valore predefinito,
+  - servizi `LoadBalancer` e route OpenShift opzionali,
+  - PostgreSQL in modalità `managed` (CloudNativePG) o `external`,
+  - `rag_chunker` come Job parallelo e CronJob opzionale.
+- Dettagli di configurazione ed esempi: [`docs/advanced-usage.it.md`](docs/advanced-usage.it.md)
+
 ## Licenza
 Questo progetto è distribuito con licenza Apache 2.0.
 - Testo completo: [`LICENSE`](LICENSE)
