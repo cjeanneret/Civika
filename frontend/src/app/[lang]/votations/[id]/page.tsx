@@ -2,6 +2,7 @@ import Link from "next/link";
 import { VotationQASection } from "@/components/qa/VotationQASection";
 import { PendingTranslationRefresher } from "@/components/common/PendingTranslationRefresher";
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
+import { SiteBrand } from "@/components/common/SiteBrand";
 import { getVotationById } from "@/lib/api";
 import { normalizeLocale } from "@/lib/i18n/config";
 import { getMessages } from "@/lib/i18n/messages";
@@ -49,6 +50,7 @@ export default async function LocalizedVotationPage({ params }: LocalizedVotatio
         {messages.backToList}
       </Link>
       <header className="page-header">
+        <SiteBrand locale={locale} compact />
         <h1>{pickBestTitle(votation, messages)}</h1>
         <p className="muted">
           {formatDate(votation.dateIso, locale, messages)} - {formatLevel(votation.level, messages)} -{" "}
