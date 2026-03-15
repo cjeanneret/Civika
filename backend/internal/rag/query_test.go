@@ -85,7 +85,7 @@ func TestExplainVotationDeterministic(t *testing.T) {
 		},
 	}
 
-	summary, err := ExplainVotation(context.Background(), summarizer, "Question", hits)
+	summary, err := ExplainVotation(context.Background(), summarizer, "Question", hits, "fr")
 	if err != nil {
 		t.Fatalf("ExplainVotation returned error: %v", err)
 	}
@@ -156,7 +156,7 @@ func TestLLMSummarizerSendsShortResponseInstruction(t *testing.T) {
 			},
 			Score: 0.91,
 		},
-	})
+	}, "de")
 	if err != nil {
 		t.Fatalf("summarize error: %v", err)
 	}
@@ -165,8 +165,8 @@ func TestLLMSummarizerSendsShortResponseInstruction(t *testing.T) {
 		t.Fatalf("expected at least 2 messages, got %d", len(captured.Messages))
 	}
 	userPrompt := captured.Messages[1].Content
-	if !strings.Contains(userPrompt, "1 ou 2 phrases maximum") {
-		t.Fatalf("expected short-response instruction in prompt, got: %q", userPrompt)
+	if !strings.Contains(userPrompt, "language code \"de\"") {
+		t.Fatalf("expected language instruction in prompt, got: %q", userPrompt)
 	}
 	if len(userPrompt) > 1200 {
 		t.Fatalf("expected prompt <= 1200 chars, got %d", len(userPrompt))
@@ -233,7 +233,7 @@ func TestLLMSummarizerRetriesWhenReasoningOnlyResponse(t *testing.T) {
 			},
 			Score: 0.91,
 		},
-	})
+	}, "fr")
 	if err != nil {
 		t.Fatalf("summarize error: %v", err)
 	}

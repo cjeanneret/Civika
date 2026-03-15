@@ -20,6 +20,7 @@ type RequestOptions = {
   method?: "GET" | "POST";
   body?: string;
   timeoutMs?: number;
+  headers?: Record<string, string>;
 };
 
 export class ApiClientError extends Error {
@@ -39,7 +40,7 @@ async function requestJSON<T>(path: string, options: RequestOptions = {}): Promi
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { ...(options.headers ?? {}) };
     if (options.body) {
       headers["Content-Type"] = "application/json";
     }
@@ -92,12 +93,20 @@ export async function getVotations(limit = 20, offset = 0, lang: LocaleCode = "f
     offset: String(offset),
     lang,
   });
-  return requestJSON<VotationListResult>(`/api/v1/votations?${query.toString()}`);
+  return requestJSON<VotationListResult>(`/api/v1/votations?${query.toString()}`, {
+    headers: {
+      "Accept-Language": lang,
+    },
+  });
 }
 
 export async function getVotationById(id: string, lang: LocaleCode = "fr"): Promise<VotationDetail> {
   const query = new URLSearchParams({ lang });
-  return requestJSON<VotationDetail>(`/api/v1/votations/${encodeURIComponent(id)}?${query.toString()}`);
+  return requestJSON<VotationDetail>(`/api/v1/votations/${encodeURIComponent(id)}?${query.toString()}`, {
+    headers: {
+      "Accept-Language": lang,
+    },
+  });
 }
 
 export async function queryQA(input: QAQueryInput): Promise<QAQueryOutput> {
@@ -105,5 +114,8 @@ export async function queryQA(input: QAQueryInput): Promise<QAQueryOutput> {
     method: "POST",
     body: JSON.stringify(input),
     timeoutMs: 120_000,
+    headers: {
+      "Accept-Language": input.language,
+    },
   });
 }

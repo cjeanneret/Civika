@@ -184,6 +184,8 @@ paths:
       tags: [QA]
       summary: Requete QA
       operationId: postQAQuery
+      parameters:
+        - $ref: "#/components/parameters/AcceptLanguage"
       requestBody:
         required: true
         content:
@@ -251,7 +253,16 @@ components:
       required: false
       schema:
         type: string
-        pattern: "^[a-z]{2}(-[a-z]{2})?$"
+        enum: [fr, de, it, rm, en]
+    AcceptLanguage:
+      name: Accept-Language
+      in: header
+      required: false
+      description: >
+        Priorite pour QA si `language` est vide: `language` (body) >
+        `Accept-Language` > langue par defaut.
+      schema:
+        type: string
     DateFrom:
       name: date_from
       in: query
@@ -361,7 +372,8 @@ components:
           schema:
             $ref: "#/components/schemas/APIError"
     InvalidBody:
-      description: Corps de requete invalide
+      description: >
+        Corps de requete invalide (incluant une langue non supportee)
       content:
         application/json:
           schema:
@@ -609,7 +621,7 @@ components:
           maxLength: 2000
         language:
           type: string
-          pattern: "^[a-z]{2}(-[a-z]{2})?$"
+          enum: [fr, de, it, rm, en]
         context:
           type: object
           properties:
@@ -661,6 +673,7 @@ components:
           type: string
         language:
           type: string
+          enum: [fr, de, it, rm, en]
         citations:
           type: array
           items:

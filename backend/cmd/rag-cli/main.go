@@ -817,7 +817,7 @@ func runQuery(cfg config.Config, args []string) error {
 	if err != nil {
 		return err
 	}
-	summary, err := rag.ExplainVotation(ctx, summarizer, *question, hits)
+	summary, err := rag.ExplainVotation(ctx, summarizer, *question, hits, cfg.RAG.DefaultLanguage)
 	if err != nil {
 		return fmt.Errorf("summarize results: %w", err)
 	}

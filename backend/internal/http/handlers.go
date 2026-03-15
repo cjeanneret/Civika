@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"civika/backend/internal/debuglog"
+	"civika/backend/internal/langs"
 	"civika/backend/internal/rag"
 	"civika/backend/internal/services"
 )
@@ -48,6 +49,8 @@ type apiHandlers struct {
 	qaCacheMetrics  services.QACacheMetricsReader
 	apiVersion      string
 	ragMode         string
+	supportedLangs  []string
+	defaultLang     string
 }
 
 func (h apiHandlers) rootHandler(w http.ResponseWriter, _ *http.Request) {
@@ -263,6 +266,12 @@ func (h apiHandlers) qaQueryHandler(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, r, http.StatusBadRequest, "invalid_body", err.Error())
 		return
 	}
+	resolvedLanguage, err := resolveQALanguage(requestBody.Language, r.Header.Get("Accept-Language"), h.supportedLangs, h.defaultLang)
+	if err != nil {
+		writeAPIError(w, r, http.StatusBadRequest, "invalid_body", err.Error())
+		return
+	}
+	requestBody.Language = resolvedLanguage
 	start := time.Now()
 	// #region agent log
 	debuglog.Log(queryCtx, "H5", "backend/internal/http/handlers.go:qaQueryHandler", "qa service query start", map[string]any{
@@ -474,7 +483,6 @@ func decodeQARequest(r *http.Request) (services.QAQueryInput, error) {
 	if len(payload.Question) > 2000 {
 		return services.QAQueryInput{}, errors.New("question trop longue")
 	}
-	payload.Language = normalizeLanguage(payload.Language)
 	if payload.Context.VotationID != "" && !isSafeID(payload.Context.VotationID) {
 		return services.QAQueryInput{}, errors.New("context.votationId invalide")
 	}
@@ -506,6 +514,95 @@ func normalizeLanguage(raw string) string {
 		return lang
 	}
 	return "fr"
+}
+
+func resolveQALanguage(bodyLanguage string, acceptLanguage string, supported []string, defaultLanguage string) (string, error) {
+	if requested := strings.TrimSpace(bodyLanguage); requested != "" {
+		normalized, ok := normalizeBaseLanguage(requested)
+		if !ok {
+			return "", errors.New("language invalide")
+		}
+		if len(supported) > 0 && !langs.Contains(supported, normalized) {
+			return "", errors.New("language non supportee")
+		}
+		return normalized, nil
+	}
+
+	acceptCandidates := parseAcceptLanguageHeader(acceptLanguage)
+	if len(acceptCandidates) > 0 {
+		for _, candidate := range acceptCandidates {
+			if len(supported) == 0 || langs.Contains(supported, candidate) {
+				return candidate, nil
+			}
+		}
+		return "", errors.New("language non supportee")
+	}
+
+	if normalized, ok := normalizeBaseLanguage(defaultLanguage); ok {
+		if len(supported) == 0 || langs.Contains(supported, normalized) {
+			return normalized, nil
+		}
+	}
+	if len(supported) > 0 {
+		return supported[0], nil
+	}
+	return "fr", nil
+}
+
+func parseAcceptLanguageHeader(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	seen := map[string]struct{}{}
+	for _, part := range parts {
+		item := strings.TrimSpace(part)
+		if item == "" {
+			continue
+		}
+		subparts := strings.Split(item, ";")
+		langPart := strings.TrimSpace(subparts[0])
+		if langPart == "" || langPart == "*" {
+			continue
+		}
+		if hasZeroQuality(subparts[1:]) {
+			continue
+		}
+		normalized, ok := normalizeBaseLanguage(langPart)
+		if !ok {
+			continue
+		}
+		if _, exists := seen[normalized]; exists {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		out = append(out, normalized)
+	}
+	return out
+}
+
+func hasZeroQuality(parts []string) bool {
+	for _, raw := range parts {
+		value := strings.TrimSpace(raw)
+		if value == "" {
+			continue
+		}
+		if !strings.HasPrefix(strings.ToLower(value), "q=") {
+			continue
+		}
+		quality := strings.TrimSpace(value[2:])
+		return quality == "0" || quality == "0.0" || quality == "0.00" || quality == "0.000"
+	}
+	return false
+}
+
+func normalizeBaseLanguage(raw string) (string, bool) {
+	normalized := langs.Normalize(raw)
+	if normalized == "" {
+		return "", false
+	}
+	if dash := strings.IndexByte(normalized, '-'); dash > 0 {
+		normalized = normalized[:dash]
+	}
+	return normalized, true
 }
 
 func writeJSON(w http.ResponseWriter, statusCode int, payload any) {

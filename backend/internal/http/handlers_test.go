@@ -57,6 +57,15 @@ func (f fakeQAService) Query(_ context.Context, _ services.QAQueryInput) (servic
 	return services.QAQueryOutput{Answer: "ok", Language: "fr"}, nil
 }
 
+type captureQAService struct {
+	lastInput services.QAQueryInput
+}
+
+func (f *captureQAService) Query(_ context.Context, input services.QAQueryInput) (services.QAQueryOutput, error) {
+	f.lastInput = input
+	return services.QAQueryOutput{Answer: "ok", Language: input.Language}, nil
+}
+
 type fakeUsageMetrics struct{}
 
 func (f fakeUsageMetrics) ListUsageEvents(_ context.Context, _ rag.UsageListFilter) ([]rag.UsageEventRow, error) {
@@ -291,6 +300,76 @@ func TestQAQueryAcceptsStrictJSON(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200 for strict JSON payload, got %d", rec.Code)
+	}
+}
+
+func TestQAQueryRejectsUnsupportedBodyLanguage(t *testing.T) {
+	router := buildRouterForTest(fakeVotationService{}, fakeQAService{})
+	body := []byte(`{"question":"Que change cette votation ?","language":"es"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/qa/query", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unsupported language, got %d", rec.Code)
+	}
+	var payload apiError
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("expected API error JSON: %v", err)
+	}
+	if payload.Code != "invalid_body" {
+		t.Fatalf("expected invalid_body code, got %q", payload.Code)
+	}
+}
+
+func TestQAQueryResolvesLanguageFromAcceptLanguageHeader(t *testing.T) {
+	qaSvc := &captureQAService{}
+	router := buildRouterForTest(fakeVotationService{}, qaSvc)
+	body := []byte(`{"question":"Que change cette votation ?","language":""}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/qa/query", bytes.NewReader(body))
+	req.Header.Set("Accept-Language", "de-CH,de;q=0.8,en;q=0.6")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if qaSvc.lastInput.Language != "de" {
+		t.Fatalf("expected resolved language de, got %q", qaSvc.lastInput.Language)
+	}
+}
+
+func TestQAQueryRejectsUnsupportedAcceptLanguage(t *testing.T) {
+	router := buildRouterForTest(fakeVotationService{}, fakeQAService{})
+	body := []byte(`{"question":"Que change cette votation ?","language":""}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/qa/query", bytes.NewReader(body))
+	req.Header.Set("Accept-Language", "es-ES,pt;q=0.8")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unsupported accept-language, got %d", rec.Code)
+	}
+}
+
+func TestQAQueryBodyLanguageTakesPriorityOverHeader(t *testing.T) {
+	qaSvc := &captureQAService{}
+	router := buildRouterForTest(fakeVotationService{}, qaSvc)
+	body := []byte(`{"question":"Que change cette votation ?","language":"it"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/qa/query", bytes.NewReader(body))
+	req.Header.Set("Accept-Language", "de-CH,de;q=0.8")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if qaSvc.lastInput.Language != "it" {
+		t.Fatalf("expected language it from body, got %q", qaSvc.lastInput.Language)
 	}
 }
 
