@@ -2,12 +2,25 @@ package langs
 
 import "testing"
 
-func TestParseSupportedMergesAndNormalizes(t *testing.T) {
+func TestParseSupportedOverridesDefaultsWhenConfigured(t *testing.T) {
 	got := ParseSupported(" EN,pt-BR,invalid,fr ", []string{"fr", "de"})
-	if len(got) != 4 {
-		t.Fatalf("expected 4 langs, got %d (%v)", len(got), got)
+	if len(got) != 3 {
+		t.Fatalf("expected 3 langs, got %d (%v)", len(got), got)
 	}
-	expected := []string{"fr", "de", "en", "pt-br"}
+	expected := []string{"en", "pt-br", "fr"}
+	for i := range expected {
+		if got[i] != expected[i] {
+			t.Fatalf("expected %v, got %v", expected, got)
+		}
+	}
+}
+
+func TestParseSupportedUsesDefaultsWhenUnset(t *testing.T) {
+	got := ParseSupported(" ", []string{"fr", "de"})
+	if len(got) != 2 {
+		t.Fatalf("expected 2 langs, got %d (%v)", len(got), got)
+	}
+	expected := []string{"fr", "de"}
 	for i := range expected {
 		if got[i] != expected[i] {
 			t.Fatalf("expected %v, got %v", expected, got)

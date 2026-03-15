@@ -58,10 +58,30 @@ func TestExplainVotationDeterministic(t *testing.T) {
 	hits := []SearchHit{
 		{
 			Chunk: Chunk{
+				DocumentID: "doc-1",
 				Title:      "Titre source",
 				SourcePath: "source.md",
+				Text:       "Le Conseil federal propose une reforme fiscale pour renforcer le financement des infrastructures cantonales.",
 			},
 			Score: 0.8,
+		},
+		{
+			Chunk: Chunk{
+				DocumentID: "doc-1",
+				Title:      "Titre source",
+				SourcePath: "source.md",
+				Text:       "Texte dupliqué qui ne doit pas creer une seconde phrase.",
+			},
+			Score: 0.79,
+		},
+		{
+			Chunk: Chunk{
+				DocumentID: "doc-2",
+				Title:      "Deuxieme source",
+				SourcePath: "source2.md",
+				Text:       "Le projet prevoit aussi un mecanisme de controle budgetaire et une application progressive.",
+			},
+			Score: 0.7,
 		},
 	}
 
@@ -72,11 +92,19 @@ func TestExplainVotationDeterministic(t *testing.T) {
 	if summary == "" {
 		t.Fatal("expected non-empty summary")
 	}
+	if strings.Contains(summary, "Question:") {
+		t.Fatalf("expected summary not to echo question, got %q", summary)
+	}
+	if strings.Contains(summary, "Texte dupliqué") {
+		t.Fatalf("expected duplicate source to be ignored, got %q", summary)
+	}
+	if !strings.Contains(summary, "reforme fiscale") {
+		t.Fatalf("expected summary to use source text, got %q", summary)
+	}
 }
 
-func TestLLMSummarizerSendsOutputTokenCapAndShortResponseInstruction(t *testing.T) {
+func TestLLMSummarizerSendsShortResponseInstruction(t *testing.T) {
 	var captured struct {
-		MaxTokens int `json:"max_tokens"`
 		Messages  []struct {
 			Role    string `json:"role"`
 			Content string `json:"content"`
@@ -111,7 +139,6 @@ func TestLLMSummarizerSendsOutputTokenCapAndShortResponseInstruction(t *testing.
 		ModelName:       "test-model",
 		Timeout:         2 * time.Second,
 		MaxPromptChars:  1200,
-		MaxOutputTokens: 77,
 	})
 	if err != nil {
 		t.Fatalf("constructor error: %v", err)
@@ -134,9 +161,6 @@ func TestLLMSummarizerSendsOutputTokenCapAndShortResponseInstruction(t *testing.
 		t.Fatalf("summarize error: %v", err)
 	}
 
-	if captured.MaxTokens != 77 {
-		t.Fatalf("expected max_tokens=77, got %d", captured.MaxTokens)
-	}
 	if len(captured.Messages) < 2 {
 		t.Fatalf("expected at least 2 messages, got %d", len(captured.Messages))
 	}
@@ -146,5 +170,77 @@ func TestLLMSummarizerSendsOutputTokenCapAndShortResponseInstruction(t *testing.
 	}
 	if len(userPrompt) > 1200 {
 		t.Fatalf("expected prompt <= 1200 chars, got %d", len(userPrompt))
+	}
+}
+
+func TestLLMSummarizerRetriesWhenReasoningOnlyResponse(t *testing.T) {
+	callCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if _, exists := payload["max_tokens"]; exists {
+			t.Fatalf("did not expect max_tokens in payload")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if callCount == 1 {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"choices": []map[string]any{
+					{
+						"message": map[string]any{
+							"content":   "",
+							"reasoning": "draft reasoning only",
+						},
+					},
+				},
+			})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{
+				{
+					"message": map[string]any{
+						"content": "Resume final.",
+					},
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	summarizer, err := NewLLMSummarizer(LLMSummarizerConfig{
+		Enabled:         true,
+		BaseURL:         server.URL,
+		ModelName:       "test-model",
+		Timeout:         2 * time.Second,
+		MaxPromptChars:  1200,
+	})
+	if err != nil {
+		t.Fatalf("constructor error: %v", err)
+	}
+
+	summary, err := summarizer.Summarize(context.Background(), "Quels sont les enjeux?", []SearchHit{
+		{
+			Chunk: Chunk{
+				SourcePath: "src.md",
+				Title:      "Source",
+				Text:       "Texte source",
+				Source: SourceMetadata{
+					SourceURI: "https://example.test/source",
+				},
+			},
+			Score: 0.91,
+		},
+	})
+	if err != nil {
+		t.Fatalf("summarize error: %v", err)
+	}
+	if summary != "Resume final." {
+		t.Fatalf("expected final summary, got %q", summary)
+	}
+	if callCount != 2 {
+		t.Fatalf("expected 2 attempts, got %d", callCount)
 	}
 }

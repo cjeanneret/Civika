@@ -146,6 +146,16 @@ type opTextsResponse struct {
 	Data []opText   `json:"data"`
 }
 
+type opBody struct {
+	BodyKey   string            `json:"body_key"`
+	CantonKey string            `json:"canton_key"`
+	Name      map[string]string `json:"name"`
+}
+
+type opBodiesResponse struct {
+	Data []opBody `json:"data"`
+}
+
 type normalizedInitiant struct {
 	Fullname string `json:"fullname"`
 	Party    string `json:"party,omitempty"`
@@ -175,6 +185,7 @@ type normalizedFixture struct {
 	SelectionStrategy  string               `json:"selection_strategy"`
 	AvailableLanguages []string             `json:"available_languages,omitempty"`
 	DisplayTitle       map[string]string    `json:"display_title,omitempty"`
+	Canton             string               `json:"canton,omitempty"`
 	CommuneCode        string               `json:"commune_code,omitempty"`
 	CommuneName        string               `json:"commune_name,omitempty"`
 	Voting             opVoting             `json:"voting"`
@@ -844,7 +855,8 @@ func processVoting(ctx context.Context, f *fetcher, rawRoot, normRoot string, ra
 		return fmt.Errorf("decode texts: %w", err)
 	}
 
-	normalized := buildNormalizedFixture(voting, affair, contributors.Data, docs.Data, texts.Data, selectionStrategy)
+	locationHint := deriveBodyLocationHint(crawledBodies, voting)
+	normalized := buildNormalizedFixture(voting, affair, contributors.Data, docs.Data, texts.Data, selectionStrategy, locationHint)
 	normalizedJSON, err := json.MarshalIndent(normalized, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode normalized: %w", err)
@@ -1048,7 +1060,21 @@ func writeFile(path string, body []byte) error {
 	return nil
 }
 
-func buildNormalizedFixture(voting opVoting, affair opAffair, contributors []opContributor, docs []opDoc, texts []opText, selectionStrategy string) normalizedFixture {
+type bodyLocationHint struct {
+	Canton      string
+	CommuneCode string
+	CommuneName string
+}
+
+func buildNormalizedFixture(
+	voting opVoting,
+	affair opAffair,
+	contributors []opContributor,
+	docs []opDoc,
+	texts []opText,
+	selectionStrategy string,
+	locationHint bodyLocationHint,
+) normalizedFixture {
 	initiants := selectInitiants(contributors)
 	args := extractArguments(docs, texts)
 	displayTitle := deriveDisplayTitleMap(voting, affair)
@@ -1057,13 +1083,16 @@ func buildNormalizedFixture(voting opVoting, affair opAffair, contributors []opC
 		strings.TrimSpace(lookupVotingString(voting, "municipality_code")),
 		strings.TrimSpace(lookupVotingString(voting, "gemeinde_code")),
 		strings.TrimSpace(lookupVotingString(voting, "comune_code")),
+		strings.TrimSpace(locationHint.CommuneCode),
 	)
 	communeName := firstNonEmpty(
 		strings.TrimSpace(lookupVotingString(voting, "commune_name")),
 		strings.TrimSpace(lookupVotingString(voting, "municipality_name")),
 		strings.TrimSpace(lookupVotingString(voting, "gemeinde_name")),
 		strings.TrimSpace(lookupVotingString(voting, "comune_name")),
+		strings.TrimSpace(locationHint.CommuneName),
 	)
+	canton := strings.ToUpper(strings.TrimSpace(locationHint.Canton))
 
 	outDocs := make([]normalizedDoc, 0, len(docs))
 	for _, d := range docs {
@@ -1096,6 +1125,7 @@ func buildNormalizedFixture(voting opVoting, affair opAffair, contributors []opC
 		SelectionStrategy:  selectionStrategy,
 		AvailableLanguages: availableLanguages,
 		DisplayTitle:       displayTitle,
+		Canton:             canton,
 		CommuneCode:        communeCode,
 		CommuneName:        communeName,
 		Voting:             voting,
@@ -1105,6 +1135,70 @@ func buildNormalizedFixture(voting opVoting, affair opAffair, contributors []opC
 		Docs:               outDocs,
 		Texts:              outTexts,
 	}
+}
+
+func deriveBodyLocationHint(crawledBodies map[string][]byte, voting opVoting) bodyLocationHint {
+	if hint, ok := deriveBodyLocationHintFromCrawled(crawledBodies, voting, true); ok {
+		return hint
+	}
+	if hint, ok := deriveBodyLocationHintFromCrawled(crawledBodies, voting, false); ok {
+		return hint
+	}
+	return bodyLocationHint{}
+}
+
+func deriveBodyLocationHintFromCrawled(crawledBodies map[string][]byte, voting opVoting, bodiesOnly bool) (bodyLocationHint, bool) {
+	targetBodyKey := strings.TrimSpace(voting.BodyKey)
+	var pendingMatch bodyLocationHint
+	var first opBody
+	foundFirst := false
+	for url, raw := range crawledBodies {
+		if bodiesOnly && !strings.Contains(strings.ToLower(url), "/bodies") {
+			continue
+		}
+		var response opBodiesResponse
+		if err := json.Unmarshal(raw, &response); err != nil {
+			continue
+		}
+		for _, body := range response.Data {
+			bodyKey := strings.TrimSpace(body.BodyKey)
+			cantonKey := strings.TrimSpace(body.CantonKey)
+			bodyName := strings.TrimSpace(localizedFirst(body.Name))
+			// Ignore non-body payloads that decode to zero-value structs.
+			if bodyKey == "" && cantonKey == "" && bodyName == "" {
+				continue
+			}
+			if !foundFirst {
+				first = body
+				foundFirst = true
+			}
+			if targetBodyKey != "" && bodyKey == targetBodyKey {
+				match := bodyLocationHint{
+					Canton:      strings.ToUpper(cantonKey),
+					CommuneCode: bodyKey,
+					CommuneName: bodyName,
+				}
+				// Prefer a match that carries at least one useful location field.
+				if match.Canton != "" || match.CommuneName != "" {
+					return match, true
+				}
+				if pendingMatch.CommuneCode == "" {
+					pendingMatch = match
+				}
+			}
+		}
+	}
+	if pendingMatch.CommuneCode != "" {
+		return pendingMatch, true
+	}
+	if !foundFirst {
+		return bodyLocationHint{}, false
+	}
+	return bodyLocationHint{
+		Canton:      strings.ToUpper(strings.TrimSpace(first.CantonKey)),
+		CommuneCode: strings.TrimSpace(first.BodyKey),
+		CommuneName: strings.TrimSpace(localizedFirst(first.Name)),
+	}, true
 }
 
 func deriveDisplayTitleMap(voting opVoting, affair opAffair) map[string]string {
@@ -1166,8 +1260,6 @@ func collectAvailableLanguages(voting opVoting, affair opAffair, docs []normaliz
 	}
 	pushMap(voting.Title)
 	pushMap(voting.AffairTitle)
-	pushMap(voting.MeaningOfYes)
-	pushMap(voting.MeaningOfNo)
 	pushMap(affair.Title)
 	pushMap(affair.TitleLong)
 	pushMap(affair.TypeName)

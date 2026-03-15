@@ -145,6 +145,45 @@ func TestParseJSONDocumentsOpenParlUsesAffairTitleAsDisplayTitle(t *testing.T) {
 	}
 }
 
+func TestParseJSONDocumentsOpenParlFallsBackToAnyLocalizedTitle(t *testing.T) {
+	raw := `{
+		"source_system":"openparldata",
+		"source_org":"OpenParlData.ch",
+		"available_languages":["fr"],
+		"voting":{
+			"id":101451,
+			"external_id":"101451",
+			"url_api":"https://api.openparldata.ch/v1/votings/101451",
+			"affair_title":{"de":"Volksschule Wankdorf"}
+		},
+		"affair":{
+			"title":{"de":"Volksschule Wankdorf"}
+		}
+	}`
+
+	docs, err := parseJSONDocuments("fixtures/01-voting-101451.json", raw)
+	if err != nil {
+		t.Fatalf("parseJSONDocuments returned error: %v", err)
+	}
+	if len(docs) < 1 {
+		t.Fatalf("expected at least 1 variant, got %d", len(docs))
+	}
+	byLang := map[string]Document{}
+	for _, doc := range docs {
+		byLang[doc.Language] = doc
+	}
+	fr, ok := byLang["fr"]
+	if !ok {
+		t.Fatal("expected fr variant")
+	}
+	if fr.Title != "Volksschule Wankdorf" {
+		t.Fatalf("expected fallback localized title, got %q", fr.Title)
+	}
+	if strings.Contains(fr.Title, "01-voting-101451") {
+		t.Fatalf("expected title not to fallback to filename, got %q", fr.Title)
+	}
+}
+
 func TestBuildOpenParlFiltersMetadataAddsCommune(t *testing.T) {
 	payload := map[string]any{
 		"affair": map[string]any{
@@ -169,5 +208,80 @@ func TestBuildOpenParlFiltersMetadataAddsCommune(t *testing.T) {
 	}
 	if got := toString(meta["level"]); got != "communal" {
 		t.Fatalf("expected level=communal when commune is present, got %q", got)
+	}
+}
+
+func TestParseJSONDocumentsOpenParlUsesDeclaredAvailableLanguagesOnly(t *testing.T) {
+	raw := `{
+		"source_system":"openparldata",
+		"source_org":"OpenParlData.ch",
+		"available_languages":["de"],
+		"voting":{
+			"id":101451,
+			"external_id":"101451",
+			"url_api":"https://api.openparldata.ch/v1/votings/101451",
+			"title":{"de":"2024.PRD.0018"},
+			"affair_title":{"de":"Volksschule Wankdorf"},
+			"meaning_of_yes":{"de":"Annahme","fr":"Nein"}
+		},
+		"affair":{
+			"title":{"de":"Volksschule Wankdorf"}
+		}
+	}`
+
+	docs, err := parseJSONDocuments("fixtures/openparldata.json", raw)
+	if err != nil {
+		t.Fatalf("parseJSONDocuments returned error: %v", err)
+	}
+	if len(docs) != 1 {
+		t.Fatalf("expected 1 variant from declared languages, got %d", len(docs))
+	}
+	if docs[0].Language != "de" {
+		t.Fatalf("expected de variant, got %q", docs[0].Language)
+	}
+}
+
+func TestBuildOpenParlFiltersMetadataDoesNotUseNumericBodyKeyAsCanton(t *testing.T) {
+	payload := map[string]any{
+		"affair": map[string]any{
+			"id":          "obj-2",
+			"external_id": "obj-2",
+		},
+	}
+	voting := map[string]any{
+		"id":          "v2",
+		"external_id": "v2",
+		"body_key":    "351",
+	}
+
+	meta := buildOpenParlFiltersMetadata(payload, voting)
+	if got := toString(meta["canton"]); got != "" {
+		t.Fatalf("expected empty canton for numeric body_key, got %q", got)
+	}
+	if got := toString(meta["commune_code"]); got != "351" {
+		t.Fatalf("expected commune_code=351 from numeric body_key, got %q", got)
+	}
+	if got := toString(meta["level"]); got != "communal" {
+		t.Fatalf("expected level=communal, got %q", got)
+	}
+}
+
+func TestBuildOpenParlFiltersMetadataUsesPayloadCantonFallback(t *testing.T) {
+	payload := map[string]any{
+		"canton": "BE",
+		"affair": map[string]any{
+			"id":          "obj-3",
+			"external_id": "obj-3",
+		},
+	}
+	voting := map[string]any{
+		"id":          "v3",
+		"external_id": "v3",
+		"body_key":    "351",
+	}
+
+	meta := buildOpenParlFiltersMetadata(payload, voting)
+	if got := toString(meta["canton"]); got != "BE" {
+		t.Fatalf("expected canton=BE from payload fallback, got %q", got)
 	}
 }

@@ -63,8 +63,6 @@ type LLMConfig struct {
 	TranslationTimeout    time.Duration
 	TranslationMaxRetries int
 	MaxPromptChars        int
-	MaxOutputTokens       int
-	TranslationMaxTokens  int
 }
 
 type LLMEmbeddingConfig struct {
@@ -136,8 +134,6 @@ func LoadFromEnv() Config {
 			TranslationTimeout:    getEnvDuration("LLM_TRANSLATION_TIMEOUT", getEnvDuration("LLM_TIMEOUT", 10*time.Second)),
 			TranslationMaxRetries: getEnvInt("LLM_TRANSLATION_MAX_RETRIES", 2),
 			MaxPromptChars:        getEnvInt("LLM_MAX_PROMPT_CHARS", 4000),
-			MaxOutputTokens:       getEnvInt("LLM_MAX_OUTPUT_TOKENS_SUMMARIZATION", 220),
-			TranslationMaxTokens:  getEnvInt("LLM_MAX_OUTPUT_TOKENS_TRANSLATION", 800),
 		},
 		LLMEmbedding: LLMEmbeddingConfig{
 			Enabled:       getEnvBool("LLM_EMBEDDING_ENABLED", false),

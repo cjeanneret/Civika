@@ -76,7 +76,6 @@ type LLMSummarizerConfig struct {
 	ModelName       string
 	Timeout         time.Duration
 	MaxPromptChars  int
-	MaxOutputTokens int
 }
 
 type LLMSummarizer struct {
@@ -96,9 +95,6 @@ func NewLLMSummarizer(cfg LLMSummarizerConfig) (*LLMSummarizer, error) {
 	}
 	if cfg.MaxPromptChars <= 0 {
 		cfg.MaxPromptChars = 4000
-	}
-	if cfg.MaxOutputTokens <= 0 {
-		cfg.MaxOutputTokens = 220
 	}
 	return &LLMSummarizer{
 		cfg: cfg,
@@ -125,108 +121,189 @@ func (s *LLMSummarizer) Summarize(ctx context.Context, question string, hits []S
 		prompt = prompt[:s.cfg.MaxPromptChars]
 	}
 
-	payload := map[string]any{
-		"model":      s.cfg.ModelName,
-		"max_tokens": s.cfg.MaxOutputTokens,
-		"messages": []map[string]string{
-			{
-				"role":    "system",
-				"content": "You summarize public Swiss votation sources. Do not infer personal user data.",
+	const maxAttempts = 3
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		payload := map[string]any{
+			"model": s.cfg.ModelName,
+			"messages": []map[string]string{
+				{
+					"role":    "system",
+					"content": "You summarize public Swiss votation sources. Do not infer personal user data.",
+				},
+				{
+					"role":    "user",
+					"content": prompt,
+				},
 			},
-			{
-				"role":    "user",
-				"content": prompt,
-			},
-		},
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return "", fmt.Errorf("marshal summarize payload: %w", err)
-	}
+		}
+		body, err := json.Marshal(payload)
+		if err != nil {
+			return "", fmt.Errorf("marshal summarize payload: %w", err)
+		}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(s.cfg.BaseURL, "/")+"/v1/chat/completions", bytes.NewReader(body))
-	if err != nil {
-		return "", fmt.Errorf("create summarize request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if s.cfg.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+s.cfg.APIKey)
-	}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(s.cfg.BaseURL, "/")+"/v1/chat/completions", bytes.NewReader(body))
+		if err != nil {
+			return "", fmt.Errorf("create summarize request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		if s.cfg.APIKey != "" {
+			req.Header.Set("Authorization", "Bearer "+s.cfg.APIKey)
+		}
 
-	requestStart := time.Now()
-	// #region agent log
-	debuglog.Log(ctx, "H4", "backend/internal/rag/query.go:LLMSummarizer.Summarize", "llm summarize request start", map[string]any{
-		"baseURL": strings.TrimRight(s.cfg.BaseURL, "/"),
-		"model":   s.cfg.ModelName,
-		"hits":    len(hits),
-	})
-	// #endregion
-	res, err := s.client.Do(req)
-	// #region agent log
-	debuglog.Log(ctx, "H4", "backend/internal/rag/query.go:LLMSummarizer.Summarize", "llm summarize request end", map[string]any{
-		"durationMs": time.Since(requestStart).Milliseconds(),
-		"error":      fmt.Sprint(err),
-	})
-	// #endregion
-	if err != nil {
-		emitUsageEvent(ctx, UsageEvent{
-			Operation:    "summarization",
-			ProviderName: "llm",
-			ModelName:    s.cfg.ModelName,
-			InputChars:   len(prompt),
-			OutputChars:  0,
-			UsageSource:  "unknown",
-			Status:       "error",
-			DurationMS:   time.Since(requestStart).Milliseconds(),
-			ErrorCode:    "request_failed",
+		requestStart := time.Now()
+		// #region agent log
+		debuglog.Log(ctx, "H4", "backend/internal/rag/query.go:LLMSummarizer.Summarize", "llm summarize request start", map[string]any{
+			"baseURL":    strings.TrimRight(s.cfg.BaseURL, "/"),
+			"model":      s.cfg.ModelName,
+			"hits":       len(hits),
+			"attempt":    attempt + 1,
 		})
-		return "", fmt.Errorf("summarize request failed: %w", err)
-	}
-	defer res.Body.Close()
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		emitUsageEvent(ctx, UsageEvent{
-			Operation:    "summarization",
-			ProviderName: "llm",
-			ModelName:    s.cfg.ModelName,
-			InputChars:   len(prompt),
-			OutputChars:  0,
-			UsageSource:  "unknown",
-			Status:       "error",
-			DurationMS:   time.Since(requestStart).Milliseconds(),
-			ErrorCode:    fmt.Sprintf("status_%d", res.StatusCode),
+		// #endregion
+		res, err := s.client.Do(req)
+		// #region agent log
+		debuglog.Log(ctx, "H4", "backend/internal/rag/query.go:LLMSummarizer.Summarize", "llm summarize request end", map[string]any{
+			"attempt":    attempt + 1,
+			"durationMs": time.Since(requestStart).Milliseconds(),
+			"error":      fmt.Sprint(err),
 		})
-		return "", fmt.Errorf("summarize request returned status %d", res.StatusCode)
-	}
+		// #endregion
+		if err != nil {
+			emitUsageEvent(ctx, UsageEvent{
+				Operation:    "summarization",
+				ProviderName: "llm",
+				ModelName:    s.cfg.ModelName,
+				InputChars:   len(prompt),
+				OutputChars:  0,
+				UsageSource:  "unknown",
+				Status:       "error",
+				DurationMS:   time.Since(requestStart).Milliseconds(),
+				ErrorCode:    "request_failed",
+			})
+			return "", fmt.Errorf("summarize request failed: %w", err)
+		}
 
-	responseBody, err := io.ReadAll(io.LimitReader(res.Body, 2*1024*1024))
-	if err != nil {
-		emitUsageEvent(ctx, UsageEvent{
-			Operation:    "summarization",
-			ProviderName: "llm",
-			ModelName:    s.cfg.ModelName,
-			InputChars:   len(prompt),
-			OutputChars:  0,
-			UsageSource:  "unknown",
-			Status:       "error",
-			DurationMS:   time.Since(requestStart).Milliseconds(),
-			ErrorCode:    "read_failed",
-		})
-		return "", fmt.Errorf("read summarize response: %w", err)
-	}
-	usage, usageErr := ParseUsageFromResponseBody(responseBody)
-	if usageErr != nil {
-		usage = UsageEvent{UsageSource: "unknown"}
-	}
+		responseBody, readErr := io.ReadAll(io.LimitReader(res.Body, 2*1024*1024))
+		_ = res.Body.Close()
+		if readErr != nil {
+			emitUsageEvent(ctx, UsageEvent{
+				Operation:    "summarization",
+				ProviderName: "llm",
+				ModelName:    s.cfg.ModelName,
+				InputChars:   len(prompt),
+				OutputChars:  0,
+				UsageSource:  "unknown",
+				Status:       "error",
+				DurationMS:   time.Since(requestStart).Milliseconds(),
+				ErrorCode:    "read_failed",
+			})
+			return "", fmt.Errorf("read summarize response: %w", readErr)
+		}
 
-	var response struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-			Text string `json:"text"`
-		} `json:"choices"`
-	}
-	if err := json.Unmarshal(responseBody, &response); err != nil {
+		usage, usageErr := ParseUsageFromResponseBody(responseBody)
+		if usageErr != nil {
+			usage = UsageEvent{UsageSource: "unknown"}
+		}
+
+		if res.StatusCode < 200 || res.StatusCode >= 300 {
+			emitUsageEvent(ctx, UsageEvent{
+				Operation:    "summarization",
+				ProviderName: "llm",
+				ModelName:    s.cfg.ModelName,
+				InputChars:   len(prompt),
+				OutputChars:  0,
+				InputTokens:  usage.InputTokens,
+				OutputTokens: usage.OutputTokens,
+				TotalTokens:  usage.TotalTokens,
+				UsageSource:  usage.UsageSource,
+				Status:       "error",
+				DurationMS:   time.Since(requestStart).Milliseconds(),
+				ErrorCode:    fmt.Sprintf("status_%d", res.StatusCode),
+			})
+			return "", fmt.Errorf("summarize request returned status %d", res.StatusCode)
+		}
+
+		var responseEnvelope map[string]any
+		if err := json.Unmarshal(responseBody, &responseEnvelope); err != nil {
+			emitUsageEvent(ctx, UsageEvent{
+				Operation:    "summarization",
+				ProviderName: "llm",
+				ModelName:    s.cfg.ModelName,
+				InputChars:   len(prompt),
+				OutputChars:  0,
+				InputTokens:  usage.InputTokens,
+				OutputTokens: usage.OutputTokens,
+				TotalTokens:  usage.TotalTokens,
+				UsageSource:  usage.UsageSource,
+				Status:       "error",
+				DurationMS:   time.Since(requestStart).Milliseconds(),
+				ErrorCode:    "decode_failed",
+			})
+			return "", fmt.Errorf("decode summarize response: %w", err)
+		}
+		choicesRaw, ok := responseEnvelope["choices"].([]any)
+		if !ok || len(choicesRaw) == 0 {
+			emitUsageEvent(ctx, UsageEvent{
+				Operation:    "summarization",
+				ProviderName: "llm",
+				ModelName:    s.cfg.ModelName,
+				InputChars:   len(prompt),
+				OutputChars:  0,
+				InputTokens:  usage.InputTokens,
+				OutputTokens: usage.OutputTokens,
+				TotalTokens:  usage.TotalTokens,
+				UsageSource:  usage.UsageSource,
+				Status:       "error",
+				DurationMS:   time.Since(requestStart).Milliseconds(),
+				ErrorCode:    "no_choices",
+			})
+			return "", errors.New("summarize response has no choices")
+		}
+		firstChoice, ok := choicesRaw[0].(map[string]any)
+		if !ok {
+			emitUsageEvent(ctx, UsageEvent{
+				Operation:    "summarization",
+				ProviderName: "llm",
+				ModelName:    s.cfg.ModelName,
+				InputChars:   len(prompt),
+				OutputChars:  0,
+				InputTokens:  usage.InputTokens,
+				OutputTokens: usage.OutputTokens,
+				TotalTokens:  usage.TotalTokens,
+				UsageSource:  usage.UsageSource,
+				Status:       "error",
+				DurationMS:   time.Since(requestStart).Milliseconds(),
+				ErrorCode:    "no_choices",
+			})
+			return "", errors.New("summarize response has no choices")
+		}
+
+		summary, reasoningOnly := extractOpenAIChoiceText(firstChoice)
+		if summary != "" {
+			emitUsageEvent(ctx, UsageEvent{
+				Operation:    "summarization",
+				ProviderName: "llm",
+				ModelName:    s.cfg.ModelName,
+				InputChars:   len(prompt),
+				OutputChars:  len(summary),
+				InputTokens:  usage.InputTokens,
+				OutputTokens: usage.OutputTokens,
+				TotalTokens:  usage.TotalTokens,
+				UsageSource:  usage.UsageSource,
+				Status:       "success",
+				DurationMS:   time.Since(requestStart).Milliseconds(),
+			})
+			return summary, nil
+		}
+
+		if reasoningOnly && attempt < maxAttempts-1 {
+			// Some reasoning models may transiently return reasoning-only before a final text answer.
+			continue
+		}
+
+		errorCode := "empty_summary"
+		if reasoningOnly {
+			errorCode = "reasoning_only"
+		}
 		emitUsageEvent(ctx, UsageEvent{
 			Operation:    "summarization",
 			ProviderName: "llm",
@@ -239,63 +316,11 @@ func (s *LLMSummarizer) Summarize(ctx context.Context, question string, hits []S
 			UsageSource:  usage.UsageSource,
 			Status:       "error",
 			DurationMS:   time.Since(requestStart).Milliseconds(),
-			ErrorCode:    "decode_failed",
-		})
-		return "", fmt.Errorf("decode summarize response: %w", err)
-	}
-	if len(response.Choices) == 0 {
-		emitUsageEvent(ctx, UsageEvent{
-			Operation:    "summarization",
-			ProviderName: "llm",
-			ModelName:    s.cfg.ModelName,
-			InputChars:   len(prompt),
-			OutputChars:  0,
-			InputTokens:  usage.InputTokens,
-			OutputTokens: usage.OutputTokens,
-			TotalTokens:  usage.TotalTokens,
-			UsageSource:  usage.UsageSource,
-			Status:       "error",
-			DurationMS:   time.Since(requestStart).Milliseconds(),
-			ErrorCode:    "no_choices",
-		})
-		return "", errors.New("summarize response has no choices")
-	}
-
-	summary := strings.TrimSpace(response.Choices[0].Message.Content)
-	if summary == "" {
-		summary = strings.TrimSpace(response.Choices[0].Text)
-	}
-	if summary == "" {
-		emitUsageEvent(ctx, UsageEvent{
-			Operation:    "summarization",
-			ProviderName: "llm",
-			ModelName:    s.cfg.ModelName,
-			InputChars:   len(prompt),
-			OutputChars:  0,
-			InputTokens:  usage.InputTokens,
-			OutputTokens: usage.OutputTokens,
-			TotalTokens:  usage.TotalTokens,
-			UsageSource:  usage.UsageSource,
-			Status:       "error",
-			DurationMS:   time.Since(requestStart).Milliseconds(),
-			ErrorCode:    "empty_summary",
+			ErrorCode:    errorCode,
 		})
 		return "", errors.New("summarize response is empty")
 	}
-	emitUsageEvent(ctx, UsageEvent{
-		Operation:    "summarization",
-		ProviderName: "llm",
-		ModelName:    s.cfg.ModelName,
-		InputChars:   len(prompt),
-		OutputChars:  len(summary),
-		InputTokens:  usage.InputTokens,
-		OutputTokens: usage.OutputTokens,
-		TotalTokens:  usage.TotalTokens,
-		UsageSource:  usage.UsageSource,
-		Status:       "success",
-		DurationMS:   time.Since(requestStart).Milliseconds(),
-	})
-	return summary, nil
+	return "", errors.New("summarize response is empty")
 }
 
 type DeterministicSummarizer struct{}
@@ -308,25 +333,102 @@ func (s *DeterministicSummarizer) Name() string {
 	return "deterministic"
 }
 
-func (s *DeterministicSummarizer) Summarize(_ context.Context, question string, hits []SearchHit) (string, error) {
+func (s *DeterministicSummarizer) Summarize(_ context.Context, _ string, hits []SearchHit) (string, error) {
 	if len(hits) == 0 {
 		return "", errors.New("hits are required")
 	}
+	highlights := collectDeterministicHighlights(hits, 2, 220)
+	if len(highlights) == 0 {
+		return "Resume deterministe indisponible: aucune source exploitable.", nil
+	}
+
 	var b strings.Builder
-	b.WriteString("Resume deterministe (LLM desactive). ")
-	b.WriteString("Question: ")
-	b.WriteString(strings.TrimSpace(question))
-	b.WriteString(". Sources principales: ")
-	for i, hit := range hits {
-		if i >= 3 {
-			break
-		}
+	b.WriteString("Resume deterministe base sur les sources indexees (LLM desactive). ")
+	for i, sentence := range highlights {
 		if i > 0 {
-			b.WriteString(", ")
+			b.WriteString(" ")
 		}
-		b.WriteString(hit.Chunk.Title)
+		b.WriteString(sentence)
 	}
 	return b.String(), nil
+}
+
+func collectDeterministicHighlights(hits []SearchHit, maxHighlights int, maxCharsPerHighlight int) []string {
+	if maxHighlights <= 0 || maxCharsPerHighlight <= 0 {
+		return nil
+	}
+
+	seenSources := make(map[string]struct{}, maxHighlights)
+	highlights := make([]string, 0, maxHighlights)
+	for _, hit := range hits {
+		sourceKey := deterministicSourceKey(hit.Chunk)
+		if _, exists := seenSources[sourceKey]; exists {
+			continue
+		}
+		seenSources[sourceKey] = struct{}{}
+
+		snippet := summarizeChunkText(hit.Chunk.Text, maxCharsPerHighlight)
+		if snippet == "" {
+			snippet = summarizeChunkTitle(hit.Chunk.Title)
+		}
+		if snippet == "" {
+			continue
+		}
+
+		highlights = append(highlights, snippet)
+		if len(highlights) >= maxHighlights {
+			break
+		}
+	}
+	return highlights
+}
+
+func deterministicSourceKey(chunk Chunk) string {
+	if value := strings.TrimSpace(chunk.DocumentID); value != "" {
+		return "doc:" + value
+	}
+	if value := strings.TrimSpace(chunk.SourcePath); value != "" {
+		return "path:" + value
+	}
+	if value := strings.TrimSpace(chunk.Title); value != "" {
+		return "title:" + strings.ToLower(value)
+	}
+	return "unknown"
+}
+
+func summarizeChunkText(text string, maxChars int) string {
+	clean := strings.Join(strings.Fields(strings.TrimSpace(text)), " ")
+	if clean == "" || maxChars <= 0 {
+		return ""
+	}
+	if len(clean) > maxChars {
+		truncated := clean[:maxChars]
+		if idx := strings.LastIndex(truncated, " "); idx > 40 {
+			truncated = truncated[:idx]
+		}
+		clean = strings.TrimSpace(truncated)
+	}
+	return ensureSentenceEnding(clean)
+}
+
+func summarizeChunkTitle(title string) string {
+	clean := strings.Join(strings.Fields(strings.TrimSpace(title)), " ")
+	if clean == "" {
+		return ""
+	}
+	return ensureSentenceEnding(clean)
+}
+
+func ensureSentenceEnding(value string) string {
+	clean := strings.TrimSpace(value)
+	if clean == "" {
+		return ""
+	}
+	lastChar := clean[len(clean)-1]
+	if lastChar == '.' || lastChar == '!' || lastChar == '?' {
+		return clean
+	}
+	return clean + "."
 }
 
 func ExplainVotation(ctx context.Context, summarizer Summarizer, question string, hits []SearchHit) (string, error) {

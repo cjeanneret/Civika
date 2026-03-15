@@ -765,7 +765,6 @@ func buildSummarizer(cfg config.Config) (rag.Summarizer, error) {
 			ModelName:       cfg.LLM.ModelName,
 			Timeout:         cfg.LLM.Timeout,
 			MaxPromptChars:  cfg.LLM.MaxPromptChars,
-			MaxOutputTokens: cfg.LLM.MaxOutputTokens,
 		})
 	}
 	return rag.NewDeterministicSummarizer(), nil
@@ -798,7 +797,6 @@ func buildTranslator(cfg config.Config) (rag.Translator, error) {
 		Timeout:         cfg.LLM.TranslationTimeout,
 		MaxInputChars:   cfg.LLM.MaxPromptChars,
 		MaxRetries:      cfg.LLM.TranslationMaxRetries,
-		MaxOutputTokens: cfg.LLM.TranslationMaxTokens,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create llm translator: %w", err)

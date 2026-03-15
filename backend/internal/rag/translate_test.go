@@ -130,6 +130,13 @@ func TestLLMTranslatorTranslateRetriesOnEmptyResponse(t *testing.T) {
 	var callCount int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		current := atomic.AddInt32(&callCount, 1)
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if _, exists := payload["max_tokens"]; exists {
+			t.Fatalf("did not expect max_tokens in payload")
+		}
 		w.Header().Set("Content-Type", "application/json")
 		if current == 1 {
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -137,6 +144,7 @@ func TestLLMTranslatorTranslateRetriesOnEmptyResponse(t *testing.T) {
 					{
 						"message": map[string]any{
 							"content": "",
+							"reasoning": "internal analysis",
 						},
 						"finish_reason": "stop",
 					},
@@ -233,10 +241,8 @@ func TestLLMTranslatorTranslateFailsAfterRetryExhausted(t *testing.T) {
 	}
 }
 
-func TestLLMTranslatorSendsOutputTokenCap(t *testing.T) {
-	var captured struct {
-		MaxTokens int `json:"max_tokens"`
-	}
+func TestLLMTranslatorDoesNotSendOutputTokenCap(t *testing.T) {
+	var captured map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
 			t.Fatalf("decode request: %v", err)
@@ -261,7 +267,6 @@ func TestLLMTranslatorSendsOutputTokenCap(t *testing.T) {
 		ModelName:       "test-model",
 		Timeout:         2 * time.Second,
 		MaxInputChars:   4000,
-		MaxOutputTokens: 123,
 	})
 	if err != nil {
 		t.Fatalf("unexpected constructor error: %v", err)
@@ -276,8 +281,8 @@ func TestLLMTranslatorSendsOutputTokenCap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected translate error: %v", err)
 	}
-	if captured.MaxTokens != 123 {
-		t.Fatalf("expected max_tokens=123, got %d", captured.MaxTokens)
+	if _, exists := captured["max_tokens"]; exists {
+		t.Fatalf("did not expect max_tokens in payload")
 	}
 }
 
@@ -329,7 +334,7 @@ func TestLLMTranslatorExtractsStructuredMessageContent(t *testing.T) {
 	}
 }
 
-func TestLLMTranslatorFallsBackToReasoningContent(t *testing.T) {
+func TestLLMTranslatorIgnoresReasoningContentAndUsesTextFallback(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/chat/completions" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
@@ -342,6 +347,7 @@ func TestLLMTranslatorFallsBackToReasoningContent(t *testing.T) {
 						"content":           "",
 						"reasoning_content": "Texte traduit depuis reasoning_content",
 					},
+					"text":          "Texte traduit depuis text",
 					"finish_reason": "length",
 				},
 			},
@@ -370,12 +376,12 @@ func TestLLMTranslatorFallsBackToReasoningContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected translate error: %v", err)
 	}
-	if got != "Texte traduit depuis reasoning_content" {
+	if got != "Texte traduit depuis text" {
 		t.Fatalf("unexpected translation: %q", got)
 	}
 }
 
-func TestLLMTranslatorFallsBackToReasoningField(t *testing.T) {
+func TestLLMTranslatorIgnoresReasoningFieldAndReturnsEmptyError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/chat/completions" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
@@ -413,10 +419,11 @@ func TestLLMTranslatorFallsBackToReasoningField(t *testing.T) {
 		TargetLang:   "fr",
 		ContentLabel: "document content",
 	})
-	if err != nil {
-		t.Fatalf("unexpected translate error: %v", err)
+	if err == nil {
+		t.Fatalf("expected translate error, got translation: %q", got)
 	}
-	if got != "Texte traduit depuis reasoning" {
-		t.Fatalf("unexpected translation: %q", got)
+	if !strings.Contains(err.Error(), "reasoning but no answer text") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
