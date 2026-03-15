@@ -112,3 +112,108 @@ func TestBodyFromCacheOrFetchUsesInMemoryCacheFirst(t *testing.T) {
 		t.Fatalf("unexpected cached body: %s", string(body))
 	}
 }
+
+func TestDeriveBodyLocationHintUsesMatchingBodyKey(t *testing.T) {
+	crawled := map[string][]byte{
+		"https://api.openparldata.ch/v1/votings/101451/bodies": []byte(`{
+			"data": [
+				{"body_key":"351","canton_key":"BE","name":{"de":"Bern","fr":"Berne"}}
+			]
+		}`),
+	}
+	hint := deriveBodyLocationHint(crawled, opVoting{ID: 101451, BodyKey: "351"})
+	if hint.Canton != "BE" {
+		t.Fatalf("expected canton BE, got %q", hint.Canton)
+	}
+	if hint.CommuneCode != "351" {
+		t.Fatalf("expected commune code 351, got %q", hint.CommuneCode)
+	}
+	if hint.CommuneName != "Berne" {
+		t.Fatalf("expected commune name Berne, got %q", hint.CommuneName)
+	}
+}
+
+func TestDeriveBodyLocationHintIgnoresNonBodyPayloads(t *testing.T) {
+	crawled := map[string][]byte{
+		"https://api.openparldata.ch/v1/votings?limit=1": []byte(`{
+			"data": [{"id": 101451, "title": {"de": "Dummy"}}]
+		}`),
+		"https://api.openparldata.ch/v1/votings/101451/bodies": []byte(`{
+			"data": [
+				{"body_key":"351","canton_key":"BE","name":{"de":"Bern","fr":"Berne"}}
+			]
+		}`),
+	}
+	hint := deriveBodyLocationHint(crawled, opVoting{ID: 101451, BodyKey: "351"})
+	if hint.Canton != "BE" {
+		t.Fatalf("expected canton BE, got %q", hint.Canton)
+	}
+	if hint.CommuneCode != "351" {
+		t.Fatalf("expected commune code 351, got %q", hint.CommuneCode)
+	}
+	if hint.CommuneName != "Berne" {
+		t.Fatalf("expected commune name Berne, got %q", hint.CommuneName)
+	}
+}
+
+func TestDeriveBodyLocationHintPrefersRichMatchOverVotingBodyKey(t *testing.T) {
+	crawled := map[string][]byte{
+		"https://api.openparldata.ch/v1/votings/101451": []byte(`{
+			"data": [{"body_key":"351"}]
+		}`),
+		"https://api.openparldata.ch/v1/votings/101451/bodies": []byte(`{
+			"data": [
+				{"body_key":"351","canton_key":"BE","name":{"de":"Bern","fr":"Berne"}}
+			]
+		}`),
+	}
+	hint := deriveBodyLocationHint(crawled, opVoting{ID: 101451, BodyKey: "351"})
+	if hint.Canton != "BE" {
+		t.Fatalf("expected canton BE from /bodies match, got %q", hint.Canton)
+	}
+	if hint.CommuneName != "Berne" {
+		t.Fatalf("expected commune name Berne from /bodies match, got %q", hint.CommuneName)
+	}
+}
+
+func TestDeriveBodyLocationHintPrefersBodiesEndpoint(t *testing.T) {
+	crawled := map[string][]byte{
+		"https://api.openparldata.ch/v1/votings/101451": []byte(`{
+			"data": [
+				{"body_key":"351","canton_key":"SR","name":{"de":"Stadtrat (SR)"}}
+			]
+		}`),
+		"https://api.openparldata.ch/v1/votings/101451/bodies": []byte(`{
+			"data": [
+				{"body_key":"351","canton_key":"BE","name":{"de":"Bern","fr":"Berne"}}
+			]
+		}`),
+	}
+	hint := deriveBodyLocationHint(crawled, opVoting{ID: 101451, BodyKey: "351"})
+	if hint.Canton != "BE" {
+		t.Fatalf("expected canton BE from /bodies endpoint, got %q", hint.Canton)
+	}
+	if hint.CommuneName != "Berne" {
+		t.Fatalf("expected commune name Berne from /bodies endpoint, got %q", hint.CommuneName)
+	}
+}
+
+func TestCollectAvailableLanguagesIgnoresMeaningMaps(t *testing.T) {
+	voting := opVoting{
+		MeaningOfYes: map[string]string{"fr": "Nein"},
+		MeaningOfNo:  map[string]string{"it": "No"},
+		Title:        map[string]string{},
+		AffairTitle:  map[string]string{},
+	}
+	affair := opAffair{
+		Title: map[string]string{"de": "Volksschule Wankdorf"},
+	}
+	docs := []normalizedDoc{
+		{Language: "de"},
+	}
+
+	langs := collectAvailableLanguages(voting, affair, docs, nil)
+	if len(langs) != 1 || langs[0] != "de" {
+		t.Fatalf("expected only de available, got %v", langs)
+	}
+}

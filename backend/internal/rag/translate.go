@@ -80,7 +80,7 @@ func NewLLMTranslator(cfg LLMTranslatorConfig) (*LLMTranslator, error) {
 	if cfg.MaxRetries < 0 {
 		cfg.MaxRetries = 0
 	}
-	if cfg.MaxOutputTokens <= 0 {
+	if cfg.MaxOutputTokens < 0 {
 		cfg.MaxOutputTokens = 800
 	}
 	return &LLMTranslator{
@@ -98,7 +98,7 @@ func (t *LLMTranslator) Name() string {
 func (t *LLMTranslator) Translate(ctx context.Context, request TranslationRequest) (string, error) {
 	var lastErr error
 	for attempt := 0; attempt <= t.cfg.MaxRetries; attempt++ {
-		translated, retryable, err := t.translateOnce(ctx, request)
+		translated, retryable, err := t.translateOnce(ctx, request, attempt)
 		if err == nil {
 			return translated, nil
 		}
@@ -119,7 +119,7 @@ func (t *LLMTranslator) Translate(ctx context.Context, request TranslationReques
 	return "", lastErr
 }
 
-func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRequest) (string, bool, error) {
+func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRequest, attempt int) (string, bool, error) {
 	text := strings.TrimSpace(request.Text)
 	if text == "" {
 		return "", false, errors.New("translation text is required")
@@ -137,8 +137,7 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 	}
 	prompt := buildTranslationPrompt(text, sourceLang, targetLang, request.ContentLabel)
 	payload := map[string]any{
-		"model":      t.cfg.ModelName,
-		"max_tokens": t.cfg.MaxOutputTokens,
+		"model": t.cfg.ModelName,
 		"messages": []map[string]string{
 			{
 				"role":    "system",
@@ -149,6 +148,10 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 				"content": prompt,
 			},
 		},
+	}
+	if t.cfg.MaxOutputTokens > 0 {
+		effectiveMaxTokens := translationMaxTokensForAttempt(t.cfg.MaxOutputTokens, attempt)
+		payload["max_tokens"] = effectiveMaxTokens
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -281,8 +284,14 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 		})
 		return "", true, errors.New("translation response has no choices")
 	}
-	translated := extractOpenAIChoiceText(firstChoice)
+	translated, reasoningOnly := extractOpenAIChoiceText(firstChoice)
 	if translated == "" {
+		errorCode := "empty_text"
+		errMessage := "translation response is empty"
+		if reasoningOnly {
+			errorCode = "reasoning_only"
+			errMessage = "translation response has reasoning but no answer text"
+		}
 		emitUsageEvent(ctx, UsageEvent{
 			Operation:    "translation",
 			ProviderName: "llm",
@@ -297,9 +306,9 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 			UsageSource:  usage.UsageSource,
 			Status:       "error",
 			DurationMS:   time.Since(requestStarted).Milliseconds(),
-			ErrorCode:    "empty_text",
+			ErrorCode:    errorCode,
 		})
-		return "", true, errors.New("translation response is empty")
+		return "", true, errors.New(errMessage)
 	}
 	emitUsageEvent(ctx, UsageEvent{
 		Operation:    "translation",
@@ -319,26 +328,53 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 	return translated, false, nil
 }
 
-func extractOpenAIChoiceText(choice map[string]any) string {
+func extractOpenAIChoiceText(choice map[string]any) (string, bool) {
+	reasoningOnly := false
 	messageRaw, hasMessage := choice["message"]
 	if hasMessage {
 		if messageMap, ok := messageRaw.(map[string]any); ok {
 			translated := extractMessageContentText(messageMap["content"])
 			if translated != "" {
-				return translated
+				return translated, false
 			}
-			reasoningContent := strings.TrimSpace(anyToString(messageMap["reasoning_content"]))
-			if reasoningContent != "" {
-				return reasoningContent
-			}
-			reasoning := strings.TrimSpace(anyToString(messageMap["reasoning"]))
-			if reasoning != "" {
-				return reasoning
+			if hasReasoningContent(messageMap) {
+				reasoningOnly = true
 			}
 		}
 	}
 	translated := strings.TrimSpace(anyToString(choice["text"]))
-	return translated
+	if translated != "" {
+		return translated, false
+	}
+	return "", reasoningOnly
+}
+
+func hasReasoningContent(message map[string]any) bool {
+	reasoningContent := strings.TrimSpace(anyToString(message["reasoning_content"]))
+	if reasoningContent != "" {
+		return true
+	}
+	reasoning := strings.TrimSpace(anyToString(message["reasoning"]))
+	return reasoning != ""
+}
+
+func translationMaxTokensForAttempt(baseTokens int, attempt int) int {
+	if baseTokens <= 0 {
+		return 0
+	}
+	if attempt <= 0 {
+		return baseTokens
+	}
+	const maxAdaptiveTokens = 4096
+	factor := attempt + 1
+	if baseTokens > maxAdaptiveTokens/factor {
+		return maxAdaptiveTokens
+	}
+	scaled := baseTokens * factor
+	if scaled > maxAdaptiveTokens {
+		return maxAdaptiveTokens
+	}
+	return scaled
 }
 
 func extractMessageContentText(content any) string {
@@ -359,6 +395,10 @@ func extractMessageContentText(content any) string {
 				}
 				b.WriteString(segment)
 			case map[string]any:
+				partType := strings.TrimSpace(anyToString(p["type"]))
+				if partType != "" && partType != "text" && partType != "output_text" {
+					continue
+				}
 				segment := strings.TrimSpace(anyToString(p["text"]))
 				if segment == "" {
 					continue

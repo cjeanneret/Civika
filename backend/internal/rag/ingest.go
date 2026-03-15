@@ -560,10 +560,23 @@ func buildOpenParlFiltersMetadata(payload map[string]any, voting map[string]any)
 		result["votation_id"] = votationID
 	}
 	bodyKey := strings.ToUpper(strings.TrimSpace(toString(voting["body_key"])))
-	if bodyKey != "" {
-		result["canton"] = bodyKey
+	canton := ""
+	if isOpenParlCantonBodyKey(bodyKey) {
+		canton = bodyKey
+	}
+	if canton == "" {
+		payloadCanton := strings.ToUpper(strings.TrimSpace(toString(payload["canton"])))
+		if regexp.MustCompile(`^[A-Z]{2,3}$`).MatchString(payloadCanton) {
+			canton = payloadCanton
+		}
+	}
+	if canton != "" {
+		result["canton"] = canton
 	}
 	communeCode, communeName := extractOpenParlCommune(voting, payload)
+	if communeCode == "" && isOpenParlNumericBodyKey(bodyKey) {
+		communeCode = bodyKey
+	}
 	if communeCode != "" {
 		result["commune_code"] = communeCode
 	}
@@ -609,23 +622,44 @@ func deriveLevel(bodyKey string) string {
 	}
 }
 
+func isOpenParlCantonBodyKey(bodyKey string) bool {
+	if bodyKey == "" || bodyKey == "CH" || bodyKey == "BUND" {
+		return false
+	}
+	return regexp.MustCompile(`^[A-Z]{2}$`).MatchString(bodyKey)
+}
+
+func isOpenParlNumericBodyKey(bodyKey string) bool {
+	return regexp.MustCompile(`^\d+$`).MatchString(strings.TrimSpace(bodyKey))
+}
+
 func deriveOpenParlDisplayTitle(payload map[string]any, lang string, fallback string) string {
 	if voting, ok := payload["voting"].(map[string]any); ok {
-		if value := normalizeString(extractLocalizedValue(voting["affair_title"], lang), ""); value != "" {
+		if value := firstLocalizedTitle(voting["affair_title"], lang); value != "" {
 			return value
 		}
 	}
 	if affair, ok := payload["affair"].(map[string]any); ok {
-		if value := normalizeString(extractLocalizedValue(affair["title"], lang), ""); value != "" {
+		if value := firstLocalizedTitle(affair["title"], lang); value != "" {
 			return value
 		}
 	}
 	if voting, ok := payload["voting"].(map[string]any); ok {
-		if value := normalizeString(extractLocalizedValue(voting["title"], lang), ""); value != "" {
+		if value := firstLocalizedTitle(voting["title"], lang); value != "" {
 			return value
 		}
 	}
 	return fallback
+}
+
+func firstLocalizedTitle(raw any, lang string) string {
+	if value := normalizeString(extractLocalizedValue(raw, lang), ""); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(pickPreferredLocalizedValue(raw)); value != "" {
+		return value
+	}
+	return ""
 }
 
 func extractOpenParlCommune(voting map[string]any, payload map[string]any) (string, string) {
@@ -746,6 +780,11 @@ func extractLanguagesFromNormalizedFixture(payload map[string]any) []string {
 	if declared, ok := payload["available_languages"].([]any); ok {
 		for _, item := range declared {
 			push(toString(item))
+		}
+		// When normalized fixtures declare available languages, treat this list
+		// as authoritative to avoid false positives from noisy localized fields.
+		if len(out) > 0 {
+			return out
 		}
 	}
 	collectLanguageCandidates(payload, push)

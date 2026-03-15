@@ -218,15 +218,8 @@ func (s *LLMSummarizer) Summarize(ctx context.Context, question string, hits []S
 		usage = UsageEvent{UsageSource: "unknown"}
 	}
 
-	var response struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-			Text string `json:"text"`
-		} `json:"choices"`
-	}
-	if err := json.Unmarshal(responseBody, &response); err != nil {
+	var responseEnvelope map[string]any
+	if err := json.Unmarshal(responseBody, &responseEnvelope); err != nil {
 		emitUsageEvent(ctx, UsageEvent{
 			Operation:    "summarization",
 			ProviderName: "llm",
@@ -243,7 +236,26 @@ func (s *LLMSummarizer) Summarize(ctx context.Context, question string, hits []S
 		})
 		return "", fmt.Errorf("decode summarize response: %w", err)
 	}
-	if len(response.Choices) == 0 {
+	choicesRaw, ok := responseEnvelope["choices"].([]any)
+	if !ok || len(choicesRaw) == 0 {
+		emitUsageEvent(ctx, UsageEvent{
+			Operation:    "summarization",
+			ProviderName: "llm",
+			ModelName:    s.cfg.ModelName,
+			InputChars:   len(prompt),
+			OutputChars:  0,
+			InputTokens:  usage.InputTokens,
+			OutputTokens: usage.OutputTokens,
+			TotalTokens:  usage.TotalTokens,
+			UsageSource:  usage.UsageSource,
+			Status:       "error",
+			DurationMS:   time.Since(requestStart).Milliseconds(),
+			ErrorCode:    "no_choices",
+		})
+		return "", errors.New("summarize response has no choices")
+	}
+	firstChoice, ok := choicesRaw[0].(map[string]any)
+	if !ok {
 		emitUsageEvent(ctx, UsageEvent{
 			Operation:    "summarization",
 			ProviderName: "llm",
@@ -261,11 +273,12 @@ func (s *LLMSummarizer) Summarize(ctx context.Context, question string, hits []S
 		return "", errors.New("summarize response has no choices")
 	}
 
-	summary := strings.TrimSpace(response.Choices[0].Message.Content)
+	summary, reasoningOnly := extractOpenAIChoiceText(firstChoice)
 	if summary == "" {
-		summary = strings.TrimSpace(response.Choices[0].Text)
-	}
-	if summary == "" {
+		errorCode := "empty_summary"
+		if reasoningOnly {
+			errorCode = "reasoning_only"
+		}
 		emitUsageEvent(ctx, UsageEvent{
 			Operation:    "summarization",
 			ProviderName: "llm",
@@ -278,7 +291,7 @@ func (s *LLMSummarizer) Summarize(ctx context.Context, question string, hits []S
 			UsageSource:  usage.UsageSource,
 			Status:       "error",
 			DurationMS:   time.Since(requestStart).Milliseconds(),
-			ErrorCode:    "empty_summary",
+			ErrorCode:    errorCode,
 		})
 		return "", errors.New("summarize response is empty")
 	}

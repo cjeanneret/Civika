@@ -798,7 +798,7 @@ func buildTranslator(cfg config.Config) (rag.Translator, error) {
 		Timeout:         cfg.LLM.TranslationTimeout,
 		MaxInputChars:   cfg.LLM.MaxPromptChars,
 		MaxRetries:      cfg.LLM.TranslationMaxRetries,
-		MaxOutputTokens: cfg.LLM.TranslationMaxTokens,
+		MaxOutputTokens: 0,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create llm translator: %w", err)

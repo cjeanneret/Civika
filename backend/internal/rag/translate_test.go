@@ -128,8 +128,17 @@ func TestEnsureMissingTranslationsReusesExistingReadyTranslation(t *testing.T) {
 
 func TestLLMTranslatorTranslateRetriesOnEmptyResponse(t *testing.T) {
 	var callCount int32
+	type requestPayload struct {
+		MaxTokens int `json:"max_tokens"`
+	}
+	capturedMaxTokens := make([]int, 0, 2)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		current := atomic.AddInt32(&callCount, 1)
+		var payload requestPayload
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		capturedMaxTokens = append(capturedMaxTokens, payload.MaxTokens)
 		w.Header().Set("Content-Type", "application/json")
 		if current == 1 {
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -137,6 +146,7 @@ func TestLLMTranslatorTranslateRetriesOnEmptyResponse(t *testing.T) {
 					{
 						"message": map[string]any{
 							"content": "",
+							"reasoning": "internal analysis",
 						},
 						"finish_reason": "stop",
 					},
@@ -164,6 +174,7 @@ func TestLLMTranslatorTranslateRetriesOnEmptyResponse(t *testing.T) {
 		Timeout:       2 * time.Second,
 		MaxInputChars: 4000,
 		MaxRetries:    1,
+		MaxOutputTokens: 800,
 	})
 	if err != nil {
 		t.Fatalf("unexpected constructor error: %v", err)
@@ -183,6 +194,15 @@ func TestLLMTranslatorTranslateRetriesOnEmptyResponse(t *testing.T) {
 	}
 	if atomic.LoadInt32(&callCount) != 2 {
 		t.Fatalf("expected 2 calls, got %d", atomic.LoadInt32(&callCount))
+	}
+	if len(capturedMaxTokens) != 2 {
+		t.Fatalf("expected 2 captured requests, got %d", len(capturedMaxTokens))
+	}
+	if capturedMaxTokens[0] != 800 {
+		t.Fatalf("expected first attempt max_tokens=800, got %d", capturedMaxTokens[0])
+	}
+	if capturedMaxTokens[1] != 1600 {
+		t.Fatalf("expected second attempt max_tokens=1600, got %d", capturedMaxTokens[1])
 	}
 }
 
@@ -329,7 +349,7 @@ func TestLLMTranslatorExtractsStructuredMessageContent(t *testing.T) {
 	}
 }
 
-func TestLLMTranslatorFallsBackToReasoningContent(t *testing.T) {
+func TestLLMTranslatorIgnoresReasoningContentAndUsesTextFallback(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/chat/completions" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
@@ -342,6 +362,7 @@ func TestLLMTranslatorFallsBackToReasoningContent(t *testing.T) {
 						"content":           "",
 						"reasoning_content": "Texte traduit depuis reasoning_content",
 					},
+					"text":          "Texte traduit depuis text",
 					"finish_reason": "length",
 				},
 			},
@@ -370,12 +391,12 @@ func TestLLMTranslatorFallsBackToReasoningContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected translate error: %v", err)
 	}
-	if got != "Texte traduit depuis reasoning_content" {
+	if got != "Texte traduit depuis text" {
 		t.Fatalf("unexpected translation: %q", got)
 	}
 }
 
-func TestLLMTranslatorFallsBackToReasoningField(t *testing.T) {
+func TestLLMTranslatorIgnoresReasoningFieldAndReturnsEmptyError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/chat/completions" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
@@ -413,10 +434,25 @@ func TestLLMTranslatorFallsBackToReasoningField(t *testing.T) {
 		TargetLang:   "fr",
 		ContentLabel: "document content",
 	})
-	if err != nil {
-		t.Fatalf("unexpected translate error: %v", err)
+	if err == nil {
+		t.Fatalf("expected translate error, got translation: %q", got)
 	}
-	if got != "Texte traduit depuis reasoning" {
-		t.Fatalf("unexpected translation: %q", got)
+	if !strings.Contains(err.Error(), "reasoning but no answer text") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestTranslationMaxTokensForAttempt(t *testing.T) {
+	if got := translationMaxTokensForAttempt(800, 0); got != 800 {
+		t.Fatalf("attempt0 expected 800, got %d", got)
+	}
+	if got := translationMaxTokensForAttempt(800, 1); got != 1600 {
+		t.Fatalf("attempt1 expected 1600, got %d", got)
+	}
+	if got := translationMaxTokensForAttempt(800, 10); got != 4096 {
+		t.Fatalf("attempt10 expected clamp 4096, got %d", got)
+	}
+	if got := translationMaxTokensForAttempt(0, 0); got != 0 {
+		t.Fatalf("zero base expected unlimited marker 0, got %d", got)
 	}
 }

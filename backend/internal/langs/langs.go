@@ -32,8 +32,12 @@ func ParseSupported(raw string, defaults []string) []string {
 		out = append(out, normalized)
 	}
 
-	for _, value := range defaults {
-		push(value)
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		for _, value := range defaults {
+			push(value)
+		}
+		return out
 	}
 	for _, part := range strings.Split(raw, ",") {
 		push(part)
