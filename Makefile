@@ -8,7 +8,7 @@ TEST_OLLAMA_START_TIMEOUT ?= 30
 TEST_OLLAMA_HEALTH_URL ?= http://127.0.0.1:11434/api/tags
 PURGE_VOLUMES ?= 0
 
-.PHONY: help env up down logs stack-smoke db-up init-db backend-test bootstrap data-fetch test-data-fetch rag-index rag-debug-chunks rag-query rag-debug-pipeline rag-integration-pipeline rag-ci test-ollama-check test-ollama-start test-ollama-pull test-stack-up test-db-init test-infra-up test-infra-logs test-infra-down test-infra-purge test-rag-shell test-api-smoke frontend-audit backend-vulncheck security-check check-go-image-consistency
+.PHONY: help env up down logs stack-smoke db-up init-db backend-test bootstrap data-fetch test-data-fetch rag-index rag-debug-chunks rag-query rag-debug-pipeline rag-integration-pipeline rag-ci test-ollama-check test-ollama-start test-ollama-pull test-stack-up test-db-init test-infra-up test-infra-logs test-infra-down test-infra-purge test-rag-shell test-api-smoke test-api-contract frontend-audit backend-vulncheck security-check check-go-image-consistency
 
 help:
 	@echo "Civika - cibles Makefile"
@@ -47,6 +47,7 @@ help:
 	@echo "  make test-infra-purge    # arrete la stack test et supprime les volumes"
 	@echo "  make test-data-fetch     # lance data-fetch dans rag_chunker"
 	@echo "  make test-api-smoke      # smoke test HTTP API (demarre infra test par defaut)"
+	@echo "  make test-api-contract   # tests contractuels OpenAPI + checks cibles"
 	@echo "  make test-rag-shell      # ouvre un shell dans le conteneur rag_chunker"
 	@echo ""
 	@echo "Qualite / coherence:"
@@ -211,6 +212,16 @@ test-api-smoke:
 	}; \
 	trap cleanup EXIT INT TERM; \
 	./scripts/tests/smoke-api.sh
+
+test-api-contract:
+	@command -v python3 >/dev/null 2>&1 || (echo "Erreur: python3 introuvable."; exit 1)
+	@set -e; \
+	python3 -m venv .venv-api-contract; \
+	. .venv-api-contract/bin/activate; \
+	pip install --upgrade pip; \
+	pip install schemathesis pytest hypothesis; \
+	API_BASE_URL="$${API_BASE_URL:-http://127.0.0.1:8080}" pytest -q scripts/tests/schemathesis_contract_test.py; \
+	API_BASE_URL="$${API_BASE_URL:-http://127.0.0.1:8080}" python scripts/tests/checks.py
 
 frontend-audit:
 	cd frontend && npm audit --omit=dev

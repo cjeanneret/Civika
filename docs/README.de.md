@@ -9,6 +9,7 @@ Dieser Bereich bündelt die operative und technische Dokumentation des Projekts.
 - Design und Architektur: [`design.de.md`](design.de.md)
 - OpenParlData-Import: [`data-fetch.de.md`](data-fetch.de.md)
 - Transparenz zur KI-Nutzung: [`ai-usage.de.md`](ai-usage.de.md)
+- Funktionale API-Tests: [`api-functional-tests.de.md`](api-functional-tests.de.md)
 - Implementierungspläne: [`plans/`](plans/)
 - Sicherheitsaudits: [`audits/`](audits/)
 

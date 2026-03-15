@@ -1,0 +1,11 @@
+# Configuration locale recommandee pour les tests contractuels API.
+# Le workflow CI passe des options explicites pour rester deterministic.
+
+base_url = "http://127.0.0.1:8080"
+wait_for_schema = 1.0
+
+[generation]
+max_examples = 25
+
+[checks]
+enabled = ["status_code_conformance", "content_type_conformance", "response_schema_conformance"]

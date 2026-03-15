@@ -1,0 +1,116 @@
+name: API Contract Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  api-contract:
+    name: OpenAPI contract (Schemathesis)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Start PostgreSQL (test compose)
+        run: docker compose --env-file .env.test -f docker-compose.test.yml up -d postgres
+
+      - name: Init database schema
+        run: ENV_FILE=.env.test COMPOSE_FILE=docker-compose.test.yml make init-db
+
+      - name: Prepare single RAG fixture
+        run: |
+          mkdir -p data/normalized/openparldata
+          cp tests/fixtures/normalized/openparldata/01-voting-101357.json data/normalized/openparldata/
+
+      - name: Index minimal corpus (local mode)
+        env:
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: "5432"
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: civika-test-pass
+          POSTGRES_DB: civika_test
+          POSTGRES_SSLMODE: disable
+          RAG_MODE: local
+          LLM_ENABLED: "false"
+          LLM_EMBEDDING_ENABLED: "false"
+          RAG_EMBEDDING_DIMENSIONS: "768"
+        run: make rag-index CORPUS=../data/normalized/openparldata
+
+      - name: Start API in background (local mode)
+        env:
+          API_HOST: 127.0.0.1
+          API_PORT: "8080"
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: "5432"
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: civika-test-pass
+          POSTGRES_DB: civika_test
+          POSTGRES_SSLMODE: disable
+          POSTGRES_MAX_OPEN_CONNS: "10"
+          POSTGRES_MAX_IDLE_CONNS: "5"
+          RAG_MODE: local
+          RAG_TOP_K: "5"
+          RAG_CHUNK_SIZE_TOKENS: "768"
+          RAG_CHUNK_OVERLAP_RATIO: "0.15"
+          RAG_TABLE_NAME: rag_chunks
+          RAG_EMBEDDING_DIMENSIONS: "768"
+          LLM_ENABLED: "false"
+          LLM_EMBEDDING_ENABLED: "false"
+          API_QA_RATE_LIMIT_QPS: "1"
+          API_QA_RATE_LIMIT_BURST: "3"
+          API_QA_RATE_LIMIT_CLEANUP_INTERVAL: "1m"
+          DEBUG_LOG_ENABLED: "false"
+        run: |
+          cd backend
+          nohup go run ./cmd/civika-api >/tmp/civika-api.log 2>&1 &
+          echo $! >/tmp/civika-api.pid
+
+      - name: Wait for API health
+        run: |
+          for i in $(seq 1 60); do
+            if curl --max-time 3 -fsS http://127.0.0.1:8080/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API indisponible apres attente"
+          exit 1
+
+      - name: Run contract and targeted checks
+        env:
+          API_BASE_URL: http://127.0.0.1:8080
+        run: make test-api-contract
+
+      - name: Upload API log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: civika-api-log
+          path: /tmp/civika-api.log
+          if-no-files-found: ignore
+
+      - name: Cleanup
+        if: always()
+        run: |
+          if [ -f /tmp/civika-api.pid ]; then
+            kill "$(cat /tmp/civika-api.pid)" || true
+          fi
+          docker compose --env-file .env.test -f docker-compose.test.yml down --remove-orphans --volumes
