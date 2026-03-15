@@ -80,6 +80,7 @@ func main() {
 			VotationService: votationService,
 			QAService:       qaService,
 			UsageMetrics:    store,
+			QACacheMetrics:  qaCache,
 			APIVersion:      "v1",
 			RAGMode:         cfg.RAG.Mode,
 		}),

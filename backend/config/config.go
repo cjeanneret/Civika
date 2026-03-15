@@ -42,6 +42,13 @@ type QACacheConfig struct {
 	MinSemanticQuestionChars int
 }
 
+const (
+	defaultQACacheExactMaxEntries    = 500
+	defaultQACacheSemanticMaxEntries = 2000
+	maxQACacheExactEntries           = 50_000
+	maxQACacheSemanticEntries        = 100_000
+)
+
 type DebugConfig struct {
 	Enabled bool
 	LogPath string
@@ -109,10 +116,10 @@ func LoadFromEnv() Config {
 		QACache: QACacheConfig{
 			Enabled:                  getEnvBool("QA_CACHE_ENABLED", false),
 			ExactTTL:                 getEnvDuration("QA_CACHE_EXACT_TTL", 10*time.Minute),
-			ExactMaxEntries:          getEnvInt("QA_CACHE_EXACT_MAX_ENTRIES", 500),
+			ExactMaxEntries:          getEnvInt("QA_CACHE_EXACT_MAX_ENTRIES", defaultQACacheExactMaxEntries),
 			SemanticEnabled:          getEnvBool("QA_CACHE_SEMANTIC_ENABLED", false),
 			SemanticTTL:              getEnvDuration("QA_CACHE_SEMANTIC_TTL", 24*time.Hour),
-			SemanticMaxEntries:       getEnvInt("QA_CACHE_SEMANTIC_MAX_ENTRIES", 2000),
+			SemanticMaxEntries:       getEnvInt("QA_CACHE_SEMANTIC_MAX_ENTRIES", defaultQACacheSemanticMaxEntries),
 			SimilarityThreshold:      getEnvFloat64("QA_CACHE_SEMANTIC_SIMILARITY_THRESHOLD", 0.90),
 			MinSemanticQuestionChars: getEnvInt("QA_CACHE_SEMANTIC_MIN_QUESTION_CHARS", 24),
 		},
@@ -168,15 +175,11 @@ func LoadFromEnv() Config {
 	if cfg.QACache.ExactTTL <= 0 {
 		cfg.QACache.ExactTTL = 10 * time.Minute
 	}
-	if cfg.QACache.ExactMaxEntries <= 0 {
-		cfg.QACache.ExactMaxEntries = 500
-	}
+	cfg.QACache.ExactMaxEntries = clampInt(cfg.QACache.ExactMaxEntries, 1, maxQACacheExactEntries, defaultQACacheExactMaxEntries)
 	if cfg.QACache.SemanticTTL <= 0 {
 		cfg.QACache.SemanticTTL = 24 * time.Hour
 	}
-	if cfg.QACache.SemanticMaxEntries <= 0 {
-		cfg.QACache.SemanticMaxEntries = 2000
-	}
+	cfg.QACache.SemanticMaxEntries = clampInt(cfg.QACache.SemanticMaxEntries, 1, maxQACacheSemanticEntries, defaultQACacheSemanticMaxEntries)
 	if cfg.QACache.SimilarityThreshold <= 0 || cfg.QACache.SimilarityThreshold > 1 {
 		cfg.QACache.SimilarityThreshold = 0.90
 	}
@@ -298,4 +301,17 @@ func normalizeLanguageWithPreferredFallback(raw string, supported []string, pref
 		return supported[0]
 	}
 	return "fr"
+}
+
+func clampInt(value int, minValue int, maxValue int, fallback int) int {
+	if value <= 0 {
+		return fallback
+	}
+	if value < minValue {
+		return minValue
+	}
+	if value > maxValue {
+		return maxValue
+	}
+	return value
 }

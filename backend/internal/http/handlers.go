@@ -45,6 +45,7 @@ type apiHandlers struct {
 	votationService services.VotationService
 	qaService       services.QueryService
 	usageMetrics    rag.UsageMetricsReader
+	qaCacheMetrics  services.QACacheMetricsReader
 	apiVersion      string
 	ragMode         string
 }
@@ -68,8 +69,41 @@ func (h apiHandlers) rootHandler(w http.ResponseWriter, _ *http.Request) {
 					"GET /api/v1/taxonomies",
 					"POST /api/v1/qa/query",
 					"GET /api/v1/metrics/ai-usage",
+					"GET /api/v1/metrics/qa-cache",
 				},
 			},
+		},
+	})
+}
+
+func (h apiHandlers) metricsQACacheHandler(w http.ResponseWriter, r *http.Request) {
+	if h.qaCacheMetrics == nil {
+		writeAPIError(w, r, http.StatusServiceUnavailable, "service_unavailable", "service indisponible")
+		return
+	}
+	snapshot := h.qaCacheMetrics.MetricsSnapshot()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"type": "qa-cache",
+		"items": map[string]any{
+			"enabled":                   snapshot.Enabled,
+			"semanticEnabled":           snapshot.SemanticEnabled,
+			"exactEntries":              snapshot.ExactEntries,
+			"semanticEntries":           snapshot.SemanticEntries,
+			"exactHits":                 snapshot.ExactHits,
+			"semanticHits":              snapshot.SemanticHits,
+			"misses":                    snapshot.Misses,
+			"bypassSensitiveQuestion":   snapshot.BypassSensitiveQuestion,
+			"bypassSemanticDisabled":    snapshot.BypassSemanticDisabled,
+			"bypassQuestionTooShort":    snapshot.BypassQuestionTooShort,
+			"hitRate":                   snapshot.HitRate,
+			"semanticHitRate":           snapshot.SemanticHitRate,
+			"semanticScoreMeanOnHit":    snapshot.SemanticScoreMeanOnHit,
+			"savedInputTokensEstimate":  snapshot.SavedInputTokensEstimate,
+			"savedOutputTokensEstimate": snapshot.SavedOutputTokensEstimate,
+			"savedTotalTokensEstimate":  snapshot.SavedTotalTokensEstimate,
+		},
+		"meta": map[string]any{
+			"generatedAt": time.Now().UTC().Format(time.RFC3339),
 		},
 	})
 }

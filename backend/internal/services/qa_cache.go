@@ -43,6 +43,40 @@ type QACache struct {
 
 	exactEntries    map[string]qaCacheEntry
 	semanticEntries map[string]qaCacheEntry
+	metrics         qaCacheMetrics
+}
+
+type qaCacheMetrics struct {
+	exactHits                 int64
+	semanticHits              int64
+	misses                    int64
+	bypassSensitiveQuestion   int64
+	bypassSemanticDisabled    int64
+	bypassQuestionTooShort    int64
+	semanticScoreSumOnHit     float64
+	semanticScoreCountOnHit   int64
+	savedInputTokensEstimate  int64
+	savedOutputTokensEstimate int64
+	savedTotalTokensEstimate  int64
+}
+
+type QACacheMetricsSnapshot struct {
+	Enabled                   bool    `json:"enabled"`
+	SemanticEnabled           bool    `json:"semanticEnabled"`
+	ExactEntries              int     `json:"exactEntries"`
+	SemanticEntries           int     `json:"semanticEntries"`
+	ExactHits                 int64   `json:"exactHits"`
+	SemanticHits              int64   `json:"semanticHits"`
+	Misses                    int64   `json:"misses"`
+	BypassSensitiveQuestion   int64   `json:"bypassSensitiveQuestion"`
+	BypassSemanticDisabled    int64   `json:"bypassSemanticDisabled"`
+	BypassQuestionTooShort    int64   `json:"bypassQuestionTooShort"`
+	HitRate                   float64 `json:"hitRate"`
+	SemanticHitRate           float64 `json:"semanticHitRate"`
+	SemanticScoreMeanOnHit    float64 `json:"semanticScoreMeanOnHit"`
+	SavedInputTokensEstimate  int64   `json:"savedInputTokensEstimate"`
+	SavedOutputTokensEstimate int64   `json:"savedOutputTokensEstimate"`
+	SavedTotalTokensEstimate  int64   `json:"savedTotalTokensEstimate"`
 }
 
 func NewQACache(cfg config.QACacheConfig) *QACache {
@@ -81,6 +115,8 @@ func (c *QACache) GetExact(questionSanitized string, ctx qaCacheContext) (QAQuer
 	entry.LastHitAt = now
 	entry.HitCount++
 	c.exactEntries[exactKey] = entry
+	c.metrics.exactHits++
+	c.addSavedTokenEstimate(questionSanitized, entry.Output)
 	return cloneQAOutput(entry.Output), true
 }
 
@@ -118,6 +154,10 @@ func (c *QACache) GetSemantic(questionVector []float32, questionSanitized string
 	entry.LastHitAt = now
 	entry.HitCount++
 	c.semanticEntries[bestKey] = entry
+	c.metrics.semanticHits++
+	c.metrics.semanticScoreSumOnHit += bestScore
+	c.metrics.semanticScoreCountOnHit++
+	c.addSavedTokenEstimate(questionSanitized, entry.Output)
 	return cloneQAOutput(entry.Output), bestScore, true
 }
 
@@ -163,6 +203,82 @@ func (c *QACache) Set(questionSanitized string, questionVector []float32, ctx qa
 	}
 }
 
+func (c *QACache) RecordMiss() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.metrics.misses++
+}
+
+func (c *QACache) RecordBypassSensitiveQuestion() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.metrics.bypassSensitiveQuestion++
+}
+
+func (c *QACache) RecordBypassSemanticDisabled() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.metrics.bypassSemanticDisabled++
+}
+
+func (c *QACache) RecordBypassQuestionTooShort() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.metrics.bypassQuestionTooShort++
+}
+
+func (c *QACache) MetricsSnapshot() QACacheMetricsSnapshot {
+	if c == nil {
+		return QACacheMetricsSnapshot{}
+	}
+	now := c.now().UTC()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.removeExpiredLocked(now)
+
+	totalLookups := c.metrics.exactHits + c.metrics.semanticHits + c.metrics.misses
+	hitRate := 0.0
+	semanticHitRate := 0.0
+	if totalLookups > 0 {
+		hitRate = float64(c.metrics.exactHits+c.metrics.semanticHits) / float64(totalLookups)
+		semanticHitRate = float64(c.metrics.semanticHits) / float64(totalLookups)
+	}
+	semanticScoreMean := 0.0
+	if c.metrics.semanticScoreCountOnHit > 0 {
+		semanticScoreMean = c.metrics.semanticScoreSumOnHit / float64(c.metrics.semanticScoreCountOnHit)
+	}
+	return QACacheMetricsSnapshot{
+		Enabled:                   c.cfg.Enabled,
+		SemanticEnabled:           c.cfg.SemanticEnabled,
+		ExactEntries:              len(c.exactEntries),
+		SemanticEntries:           len(c.semanticEntries),
+		ExactHits:                 c.metrics.exactHits,
+		SemanticHits:              c.metrics.semanticHits,
+		Misses:                    c.metrics.misses,
+		BypassSensitiveQuestion:   c.metrics.bypassSensitiveQuestion,
+		BypassSemanticDisabled:    c.metrics.bypassSemanticDisabled,
+		BypassQuestionTooShort:    c.metrics.bypassQuestionTooShort,
+		HitRate:                   roundMetric(hitRate),
+		SemanticHitRate:           roundMetric(semanticHitRate),
+		SemanticScoreMeanOnHit:    roundMetric(semanticScoreMean),
+		SavedInputTokensEstimate:  c.metrics.savedInputTokensEstimate,
+		SavedOutputTokensEstimate: c.metrics.savedOutputTokensEstimate,
+		SavedTotalTokensEstimate:  c.metrics.savedTotalTokensEstimate,
+	}
+}
+
 func (c *QACache) removeExpiredLocked(now time.Time) {
 	for key, entry := range c.exactEntries {
 		if !entry.ExpiresAt.IsZero() && now.After(entry.ExpiresAt) {
@@ -195,6 +311,14 @@ func (c *QACache) evictOldestLocked(entries map[string]qaCacheEntry, maxEntries 
 	for i := 0; i < toDelete; i++ {
 		delete(entries, oldest[i].key)
 	}
+}
+
+func (c *QACache) addSavedTokenEstimate(questionSanitized string, output QAQueryOutput) {
+	inputEstimate := estimateTokensFromChars(len(strings.TrimSpace(questionSanitized)))
+	outputEstimate := estimateTokensFromChars(len(strings.TrimSpace(output.Answer)))
+	c.metrics.savedInputTokensEstimate += int64(inputEstimate)
+	c.metrics.savedOutputTokensEstimate += int64(outputEstimate)
+	c.metrics.savedTotalTokensEstimate += int64(inputEstimate + outputEstimate)
 }
 
 func buildExactCacheKey(questionSanitized string, ctx qaCacheContext) string {
@@ -282,4 +406,20 @@ func cosineSimilarity(a []float32, b []float32) float64 {
 
 func intToString(value int) string {
 	return strconv.Itoa(value)
+}
+
+func estimateTokensFromChars(chars int) int {
+	if chars <= 0 {
+		return 0
+	}
+	// Conservative approximation: ~4 chars per token for latin text.
+	tokens := int(math.Ceil(float64(chars) / 4.0))
+	if tokens < 1 {
+		return 1
+	}
+	return tokens
+}
+
+func roundMetric(value float64) float64 {
+	return math.Round(value*10000) / 10000
 }

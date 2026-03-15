@@ -75,6 +75,9 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 		RunID:     requestID,
 	})
 	ctx = rag.WithUsageEmitter(ctx, s.recordUsageEvent)
+	if s.cache != nil && !cacheableQuestion {
+		s.cache.RecordBypassSensitiveQuestion()
+	}
 	if s.cache != nil && cacheableQuestion {
 		if exactOutput, hit := s.cache.GetExact(safeQuestion, cacheCtx); hit {
 			debuglog.Log(ctx, "H2", "backend/internal/services/qa_service.go:Query", "qa exact cache hit", map[string]any{
@@ -90,6 +93,12 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 		err         error
 	)
 	semanticAttempted := false
+	if s.cache != nil && cacheableQuestion && s.cache.cfg.SemanticEnabled && !s.cache.IsSemanticEnabledForQuestion(safeQuestion) {
+		s.cache.RecordBypassQuestionTooShort()
+	}
+	if s.cache != nil && cacheableQuestion && !s.cache.cfg.SemanticEnabled {
+		s.cache.RecordBypassSemanticDisabled()
+	}
 	if s.cache != nil && cacheableQuestion && s.cache.IsSemanticEnabledForQuestion(safeQuestion) {
 		semanticAttempted = true
 		queryVector, err = s.embedder.EmbedQuery(ctx, safeQuestion)
@@ -103,6 +112,9 @@ func (s *QAService) Query(ctx context.Context, input QAQueryInput) (QAQueryOutpu
 			})
 			return semanticOutput, nil
 		}
+	}
+	if s.cache != nil && cacheableQuestion {
+		s.cache.RecordMiss()
 	}
 	// #region agent log
 	debuglog.Log(ctx, "H2", "backend/internal/services/qa_service.go:Query", "query rag start", map[string]any{

@@ -131,3 +131,16 @@ func TestLoadFromEnvQACacheOverrides(t *testing.T) {
 		t.Fatalf("expected min semantic question chars 18, got %d", cfg.QACache.MinSemanticQuestionChars)
 	}
 }
+
+func TestLoadFromEnvQACacheMaxEntriesClamp(t *testing.T) {
+	t.Setenv("QA_CACHE_EXACT_MAX_ENTRIES", "999999")
+	t.Setenv("QA_CACHE_SEMANTIC_MAX_ENTRIES", "999999")
+
+	cfg := LoadFromEnv()
+	if cfg.QACache.ExactMaxEntries != 50000 {
+		t.Fatalf("expected exact max entries clamp 50000, got %d", cfg.QACache.ExactMaxEntries)
+	}
+	if cfg.QACache.SemanticMaxEntries != 100000 {
+		t.Fatalf("expected semantic max entries clamp 100000, got %d", cfg.QACache.SemanticMaxEntries)
+	}
+}

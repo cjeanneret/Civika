@@ -16,3 +16,7 @@ type VotationService interface {
 type QueryService interface {
 	Query(ctx context.Context, input QAQueryInput) (QAQueryOutput, error)
 }
+
+type QACacheMetricsReader interface {
+	MetricsSnapshot() QACacheMetricsSnapshot
+}

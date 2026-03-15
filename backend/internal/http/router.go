@@ -16,6 +16,7 @@ type RouterDependencies struct {
 	VotationService services.VotationService
 	QAService       services.QueryService
 	UsageMetrics    rag.UsageMetricsReader
+	QACacheMetrics  services.QACacheMetricsReader
 	APIVersion      string
 	RAGMode         string
 }
@@ -33,6 +34,7 @@ func NewRouter(cfg config.Config, deps RouterDependencies) http.Handler {
 		votationService: deps.VotationService,
 		qaService:       deps.QAService,
 		usageMetrics:    deps.UsageMetrics,
+		qaCacheMetrics:  deps.QACacheMetrics,
 		apiVersion:      deps.APIVersion,
 		ragMode:         deps.RAGMode,
 	}
@@ -49,6 +51,7 @@ func NewRouter(cfg config.Config, deps RouterDependencies) http.Handler {
 		api.Get("/taxonomies", handlers.taxonomiesHandler)
 		api.With(qaRateLimitMiddleware(cfg)).Post("/qa/query", handlers.qaQueryHandler)
 		api.Get("/metrics/ai-usage", handlers.metricsUsageHandler)
+		api.Get("/metrics/qa-cache", handlers.metricsQACacheHandler)
 	})
 
 	return r
