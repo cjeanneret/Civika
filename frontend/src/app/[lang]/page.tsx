@@ -1,6 +1,7 @@
 import { VotationList } from "@/components/votations/VotationList";
 import { PendingTranslationRefresher } from "@/components/common/PendingTranslationRefresher";
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
+import { SiteBrand } from "@/components/common/SiteBrand";
 import { getVotations } from "@/lib/api";
 import { normalizeLocale } from "@/lib/i18n/config";
 import { getMessages } from "@/lib/i18n/messages";
@@ -36,7 +37,7 @@ export default async function LocalizedHomePage({ params }: LocalizedHomePagePro
       <PendingTranslationRefresher enabled={items.some((item) => item.translationStatus?.state === "pending")} />
       <LanguageSwitcher currentLocale={locale} pathWithoutLocale="/" />
       <header className="page-header">
-        <h1>Civika</h1>
+        <SiteBrand locale={locale} asHeading />
         <p className="muted">{messages.latestVotations}</p>
       </header>
       {errorMessage ? (
