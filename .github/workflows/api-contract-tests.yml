@@ -52,7 +52,7 @@ jobs:
           LLM_ENABLED: "false"
           LLM_EMBEDDING_ENABLED: "false"
           RAG_EMBEDDING_DIMENSIONS: "768"
-        run: make rag-index CORPUS=data/normalized/openparldata
+        run: make rag-index CORPUS=../data/normalized/openparldata
 
       - name: Start API in background (local mode)
         env:
