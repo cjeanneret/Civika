@@ -43,6 +43,15 @@ Il project combinescha in backend API en Go, in frontend TypeScript e ina pipeli
 - Sessions da debugging assistidas da IA ein era vegnidas fatgas.
 - Detagls: [`docs/ai-usage.rm.md`](docs/ai-usage.rm.md)
 
+## Deploy OpenShift (Helm)
+- Chart Helm: [`deploy/helm/civika`](deploy/helm/civika)
+- Il chart sustegna:
+  - backend e frontend cun `replicaCount=1` sco standard,
+  - servetschs `LoadBalancer` e routes OpenShift opziunalas,
+  - PostgreSQL en modus `managed` (CloudNativePG) ni `external`,
+  - `rag_chunker` sco Job parallel e CronJob opziunal.
+- Detagls da configuraziun ed exempels: [`docs/advanced-usage.rm.md`](docs/advanced-usage.rm.md)
+
 ## Licenza
 Quest project ei publitgaus sut la licenza Apache 2.0.
 - Text cumplet: [`LICENSE`](LICENSE)

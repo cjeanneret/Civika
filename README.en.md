@@ -43,6 +43,15 @@ It combines a Go backend API, a TypeScript frontend, and a RAG pipeline built on
 - AI-assisted debugging sessions were also conducted.
 - Details: [`docs/ai-usage.en.md`](docs/ai-usage.en.md)
 
+## OpenShift deployment (Helm)
+- Helm chart: [`deploy/helm/civika`](deploy/helm/civika)
+- The chart supports:
+  - backend and frontend with default `replicaCount=1`,
+  - `LoadBalancer` services and optional OpenShift routes,
+  - PostgreSQL in `managed` mode (CloudNativePG) or `external` mode,
+  - `rag_chunker` as a parallel Job and optional CronJob.
+- Configuration details and examples: [`docs/advanced-usage.en.md`](docs/advanced-usage.en.md)
+
 ## License
 This project is released under the Apache License 2.0.
 - Full text: [`LICENSE`](LICENSE)

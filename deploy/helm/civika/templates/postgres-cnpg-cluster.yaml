@@ -1,0 +1,28 @@
+{{- if eq .Values.postgresql.mode "managed" }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "civika.postgresClusterName" . }}
+  labels:
+    {{- include "civika.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  instances: {{ .Values.postgresql.managed.instances }}
+  imageName: {{ .Values.postgresql.managed.imageName | quote }}
+  enableSuperuserAccess: false
+  bootstrap:
+    initdb:
+      database: {{ .Values.postgresql.database | quote }}
+      owner: {{ .Values.postgresql.user | quote }}
+      secret:
+        name: {{ include "civika.postgresCredentialsSecretName" . }}
+  storage:
+    size: {{ .Values.postgresql.managed.storage.size | quote }}
+    {{- with .Values.postgresql.managed.storage.storageClass }}
+    storageClass: {{ . | quote }}
+    {{- end }}
+  {{- with .Values.postgresql.managed.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

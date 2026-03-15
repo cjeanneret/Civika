@@ -1,0 +1,83 @@
+{{- if .Values.ragChunker.cron.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "civika.fullname" . }}-rag-chunker
+  labels:
+    {{- include "civika.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rag-chunker
+spec:
+  schedule: {{ .Values.ragChunker.cron.schedule | quote }}
+  concurrencyPolicy: {{ .Values.ragChunker.cron.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.ragChunker.cron.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.ragChunker.cron.failedJobsHistoryLimit }}
+  startingDeadlineSeconds: {{ .Values.ragChunker.cron.startingDeadlineSeconds }}
+  suspend: {{ .Values.ragChunker.cron.suspend }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.ragChunker.job.backoffLimit }}
+      template:
+        metadata:
+          labels:
+            {{- include "civika.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: rag-chunker
+        spec:
+          restartPolicy: {{ .Values.ragChunker.cron.restartPolicy }}
+          {{- with .Values.global.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- toYaml .Values.ragChunker.podSecurityContext | nindent 12 }}
+          containers:
+            - name: rag-chunker
+              image: "{{ .Values.ragChunker.image.repository }}:{{ .Values.ragChunker.image.tag }}"
+              imagePullPolicy: {{ .Values.ragChunker.image.pullPolicy }}
+              securityContext:
+                {{- toYaml .Values.ragChunker.securityContext | nindent 16 }}
+              command:
+                {{- toYaml .Values.ragChunker.command | nindent 16 }}
+              env:
+                - name: POSTGRES_HOST
+                  value: {{ include "civika.postgresRwHost" . | quote }}
+                - name: POSTGRES_PORT
+                  value: {{ include "civika.postgresPort" . | quote }}
+                - name: POSTGRES_USER
+                  value: {{ include "civika.postgresUser" . | quote }}
+                - name: POSTGRES_DB
+                  value: {{ include "civika.postgresDatabase" . | quote }}
+                - name: POSTGRES_SSLMODE
+                  value: {{ .Values.postgresql.sslMode | quote }}
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "civika.postgresCredentialsSecretName" . }}
+                      key: password
+                - name: LLM_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "civika.backendSecretName" . }}
+                      key: {{ .Values.backend.secrets.llmApiKeyKey }}
+                - name: LLM_EMBEDDING_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "civika.backendSecretName" . }}
+                      key: {{ .Values.backend.secrets.llmEmbeddingApiKeyKey }}
+                {{- range $name, $value := .Values.ragChunker.env }}
+                - name: {{ $name }}
+                  value: {{ $value | quote }}
+                {{- end }}
+              {{- if .Values.ragChunker.dataVolume.enabled }}
+              volumeMounts:
+                - name: rag-data
+                  mountPath: {{ .Values.ragChunker.dataVolume.mountPath }}
+              {{- end }}
+              resources:
+                {{- toYaml .Values.ragChunker.resources | nindent 16 }}
+          {{- if .Values.ragChunker.dataVolume.enabled }}
+          volumes:
+            - name: rag-data
+              persistentVolumeClaim:
+                claimName: {{ include "civika.ragDataPvcName" . }}
+          {{- end }}
+{{- end }}

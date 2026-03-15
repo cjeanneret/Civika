@@ -85,3 +85,41 @@ Procédure minimale:
   - `make rag-integration-pipeline Q="Quels sont les arguments principaux de cette votation ?"`
 - Pipeline complet:
   - `make rag-ci Q="Quels sont les arguments principaux de cette votation ?"`
+
+## Déploiement Helm sur OpenShift
+- Chart: `deploy/helm/civika`
+- Installer/mettre à jour:
+  - `helm upgrade --install civika deploy/helm/civika -n civika --create-namespace`
+
+### PostgreSQL (RW/RO) via CloudNativePG
+- Mode managé (cluster créé par le chart):
+  - `helm upgrade --install civika deploy/helm/civika -n civika --set postgresql.mode=managed`
+- Mode externe (cluster déjà existant):
+  - `helm upgrade --install civika deploy/helm/civika -n civika --set postgresql.mode=external --set postgresql.external.rwHost=pg-rw.example --set postgresql.external.roHost=pg-ro.example`
+- En mode `managed`, CloudNativePG expose automatiquement:
+  - service RW: `<release>-civika-postgres-rw`,
+  - service RO: `<release>-civika-postgres-ro`.
+
+### Backend et frontend
+- Valeurs par défaut:
+  - `backend.replicaCount=1`
+  - `frontend.replicaCount=1`
+- Les deux services sont en `LoadBalancer` par défaut.
+- Routes OpenShift activables/désactivables via:
+  - `openshift.routes.enabled`
+  - `openshift.routes.backend.enabled`
+  - `openshift.routes.frontend.enabled`
+
+### Pods temporaires `rag_chunker`
+- Job parallèle ad hoc (activé par défaut):
+  - `ragChunker.job.enabled=true`
+  - `ragChunker.job.parallelism=<n>`
+  - `ragChunker.job.completions=<n>`
+- CronJob (désactivé par défaut):
+  - `ragChunker.cron.enabled=true`
+  - `ragChunker.cron.schedule="0 2 * * *"`
+- Commande exécutée par défaut:
+  - `/app/data-fetch && /app/rag-cli index --corpus /app/data/normalized --workers 4`
+- Volume de données RAG:
+  - `ragChunker.dataVolume.enabled=true`
+  - `ragChunker.dataVolume.existingClaim=<pvc>` (optionnel)
