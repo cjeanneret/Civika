@@ -16,8 +16,6 @@
   - `LLM_BASE_URL`
   - `LLM_MODEL_NAME`
   - `LLM_MAX_PROMPT_CHARS`
-  - `LLM_MAX_OUTPUT_TOKENS_SUMMARIZATION`
-  - `LLM_MAX_OUTPUT_TOKENS_TRANSLATION`
   - `LLM_TRANSLATION_MAX_RETRIES`
   - `LLM_EMBEDDING_ENABLED`
   - `LLM_EMBEDDING_BASE_URL`
@@ -34,9 +32,6 @@
 
 ## Reduction tokens (quick wins)
 - Resume QA contraint a une sortie courte (1 a 2 phrases) cote prompt.
-- Cap explicite des tokens de sortie pour:
-  - summarization (`LLM_MAX_OUTPUT_TOKENS_SUMMARIZATION`),
-  - traduction (`LLM_MAX_OUTPUT_TOKENS_TRANSLATION`).
 - Les retries de traduction sont controles par `LLM_TRANSLATION_MAX_RETRIES`.
 - Les logs techniques n'exposent pas de preview brute de reponse LLM.
 

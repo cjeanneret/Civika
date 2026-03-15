@@ -137,7 +137,6 @@ func buildRAGRuntime(cfg config.Config) (rag.Embedder, rag.Summarizer, error) {
 			ModelName:       cfg.LLM.ModelName,
 			Timeout:         cfg.LLM.Timeout,
 			MaxPromptChars:  cfg.LLM.MaxPromptChars,
-			MaxOutputTokens: cfg.LLM.MaxOutputTokens,
 		})
 		if err != nil {
 			return nil, nil, fmt.Errorf("create llm summarizer: %w", err)
@@ -160,7 +159,6 @@ func buildTranslatorRuntime(cfg config.Config) (rag.Translator, error) {
 		Timeout:         cfg.LLM.TranslationTimeout,
 		MaxInputChars:   cfg.LLM.MaxPromptChars,
 		MaxRetries:      cfg.LLM.TranslationMaxRetries,
-		MaxOutputTokens: cfg.LLM.TranslationMaxTokens,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create llm translator: %w", err)

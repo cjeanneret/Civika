@@ -56,7 +56,6 @@ type LLMTranslatorConfig struct {
 	Timeout         time.Duration
 	MaxInputChars   int
 	MaxRetries      int
-	MaxOutputTokens int
 }
 
 type LLMTranslator struct {
@@ -79,9 +78,6 @@ func NewLLMTranslator(cfg LLMTranslatorConfig) (*LLMTranslator, error) {
 	}
 	if cfg.MaxRetries < 0 {
 		cfg.MaxRetries = 0
-	}
-	if cfg.MaxOutputTokens < 0 {
-		cfg.MaxOutputTokens = 800
 	}
 	return &LLMTranslator{
 		cfg: cfg,
@@ -148,10 +144,6 @@ func (t *LLMTranslator) translateOnce(ctx context.Context, request TranslationRe
 				"content": prompt,
 			},
 		},
-	}
-	if t.cfg.MaxOutputTokens > 0 {
-		effectiveMaxTokens := translationMaxTokensForAttempt(t.cfg.MaxOutputTokens, attempt)
-		payload["max_tokens"] = effectiveMaxTokens
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -356,25 +348,6 @@ func hasReasoningContent(message map[string]any) bool {
 	}
 	reasoning := strings.TrimSpace(anyToString(message["reasoning"]))
 	return reasoning != ""
-}
-
-func translationMaxTokensForAttempt(baseTokens int, attempt int) int {
-	if baseTokens <= 0 {
-		return 0
-	}
-	if attempt <= 0 {
-		return baseTokens
-	}
-	const maxAdaptiveTokens = 4096
-	factor := attempt + 1
-	if baseTokens > maxAdaptiveTokens/factor {
-		return maxAdaptiveTokens
-	}
-	scaled := baseTokens * factor
-	if scaled > maxAdaptiveTokens {
-		return maxAdaptiveTokens
-	}
-	return scaled
 }
 
 func extractMessageContentText(content any) string {
